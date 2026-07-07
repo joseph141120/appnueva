@@ -1,0 +1,16 @@
+{
+  "name": "pos-backend-propio",
+  "version": "1.0.0",
+  "description": "Backend POS y E-Commerce de componentes de PC en Costa Rica",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "mysql2": "^3.9.7"
+  }
+}
