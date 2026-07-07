@@ -30,7 +30,7 @@ const registerRoutes = (path, method, handler) => {
 
 // Endpoint GET /productos: Trae los componentes realizando un JOIN con categorías
 registerRoutes('/productos', 'get', (req, res) => {
-  const query = "SELECT p.id, p.nombre, p.descripcion, p.stock, p.precio_costo, p.margen_ganancia, c.descripcion AS categoria_nombre FROM productos p JOIN categorias c ON p.categorias_id = c.id";
+  const query = "SELECT p.id, p.nombre, p.descripcion, p.stock, p.precio_costo, p.margen_ganancia, p.imagen, c.descripcion AS categoria_nombre FROM productos p JOIN categorias c ON p.categorias_id = c.id";
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json(results);
@@ -39,11 +39,29 @@ registerRoutes('/productos', 'get', (req, res) => {
 
 // Endpoint POST /productos: Inserta nuevos productos en la base de datos
 registerRoutes('/productos', 'post', (req, res) => {
-  const { nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id } = req.body;
-  const query = 'INSERT INTO productos (nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id) VALUES (?, ?, ?, ?, ?, ?)';
-  db.query(query, [nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id], (err, result) => {
+  const { nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen } = req.body;
+  const query = 'INSERT INTO productos (nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen) VALUES (?, ?, ?, ?, ?, ?, ?)';
+  db.query(query, [nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen || null], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, message: 'Producto insertado en MySQL', id: result.insertId });
+  });
+});
+
+// Endpoint GET /categorias: Trae todas las categorías
+registerRoutes('/categorias', 'get', (req, res) => {
+  db.query('SELECT * FROM categorias WHERE estado = 1 OR estado IS NULL', (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json(results);
+  });
+});
+
+// Endpoint POST /categorias: Registra una nueva categoría
+registerRoutes('/categorias', 'post', (req, res) => {
+  const { descripcion } = req.body;
+  if (!descripcion) return res.status(400).json({ success: false, message: 'Descripción requerida' });
+  db.query('INSERT INTO categorias (descripcion, estado) VALUES (?, 1)', [descripcion], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Categoría agregada exitosamente', id: result.insertId });
   });
 });
 
@@ -55,6 +73,17 @@ registerRoutes('/productos/:id/reabastecer', 'put', (req, res) => {
   db.query(query, [stock_adicional, id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, message: 'Stock actualizado' });
+  });
+});
+
+// Endpoint PUT /productos/:id: Actualiza detalles de un producto existente
+registerRoutes('/productos/:id', 'put', (req, res) => {
+  const { id } = req.params;
+  const { nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen } = req.body;
+  const query = 'UPDATE productos SET nombre = ?, descripcion = ?, precio_costo = ?, margen_ganancia = ?, categorias_id = ?, imagen = ? WHERE id = ?';
+  db.query(query, [nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen || null, id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Producto actualizado exitosamente en MySQL' });
   });
 });
 

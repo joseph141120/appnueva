@@ -19,6 +19,7 @@ const IMAGENES_PRODUCTOS = {
   5: require('./assets/razer_keyboard.png'),
   6: require('./assets/logitech_headset.png'),
   7: require('./assets/logitech_streamcam.png'),
+  8: require('./assets/amd_ryzen.png'),
 };
 
 const IMAGEN_DEFAULT = require('./assets/icon.png');
@@ -51,7 +52,7 @@ export default function App() {
   // Catálogo de productos y estado de carga
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
-  
+
   // Elementos en el carrito de e-commerce / POS
   const [carrito, setCarrito] = useState([]);
 
@@ -78,7 +79,10 @@ export default function App() {
   const [pestanaAdmin, setPestanaAdmin] = useState('ordenes');
   const [ordenesVenta, setOrdenesVenta] = useState([]);
   const [reabastecerProductoId, setReabastecerProductoId] = useState('');
+  const [reabastecerProductoNombre, setReabastecerProductoNombre] = useState('');
   const [reabastecerCantidad, setReabastecerCantidad] = useState('');
+  const [filtroNombreReabastecer, setFiltroNombreReabastecer] = useState('');
+  const [filtroCategoriaReabastecer, setFiltroCategoriaReabastecer] = useState('Todas');
 
   // Control de pestañas para el Vendedor (Caja vs Gestión de Órdenes)
   const [pestanaVendedor, setPestanaVendedor] = useState('pos');
@@ -90,6 +94,21 @@ export default function App() {
   const [nuevoCosto, setNuevoCosto] = useState('');
   const [nuevoGanancia, setNuevoGanancia] = useState('');
   const [nuevoCategoriaId, setNuevoCategoriaId] = useState('');
+  const [nuevoImagen, setNuevoImagen] = useState('');
+  const [dbCategorias, setDbCategorias] = useState([]);
+  const [nuevaCategoriaDescripcion, setNuevaCategoriaDescripcion] = useState('');
+  const [mostrarNuevaCategoriaForm, setMostrarNuevaCategoriaForm] = useState(false);
+
+  // Formulario para editar un componente existente
+  const [editProductoId, setEditProductoId] = useState('');
+  const [editNombre, setEditNombre] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
+  const [editCosto, setEditCosto] = useState('');
+  const [editGanancia, setEditGanancia] = useState('');
+  const [editCategoriaId, setEditCategoriaId] = useState('');
+  const [editImagen, setEditImagen] = useState('');
+  const [filtroNombreEdit, setFiltroNombreEdit] = useState('');
+  const [filtroCategoriaEdit, setFiltroCategoriaEdit] = useState('Todas');
 
   // Formulario para registrar personal interno
   const [empEmail, setEmpEmail] = useState('');
@@ -99,12 +118,32 @@ export default function App() {
   // Inicializa la carga del catálogo al montar la aplicación
   useEffect(() => {
     cargarProductos();
+    cargarCategorias();
     if (Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
         Notification.requestPermission();
       }
     }
   }, []);
+
+  // Carga la lista de categorías del servidor o usa mock local en desarrollo
+  const cargarCategorias = async () => {
+    try {
+      const datos = await apiService.get('/categorias');
+      setDbCategorias(datos);
+    } catch (error) {
+      // Mock de categorías offline por defecto
+      setDbCategorias([
+        { id: 1, descripcion: 'Procesadores' },
+        { id: 2, descripcion: 'Tarjetas de Video' },
+        { id: 3, descripcion: 'Memorias RAM' },
+        { id: 4, descripcion: 'PCs Completas' },
+        { id: 5, descripcion: 'Accesorios' },
+        { id: 6, descripcion: 'Audífonos' },
+        { id: 7, descripcion: 'Cámaras' }
+      ]);
+    }
+  };
 
   // Consulta el catálogo de productos a través de apiService.get
   const cargarProductos = async () => {
@@ -333,7 +372,7 @@ export default function App() {
   // Incrementa el stock de un producto existente en MySQL
   const manejarReabastecimiento = async () => {
     if (!reabastecerProductoId || !reabastecerCantidad) {
-      Alert.alert('Campos Requeridos', 'Por favor ingrese el ID del componente y la cantidad.');
+      Alert.alert('Campos Requeridos', 'Por favor selecciona un componente de la lista y define la cantidad.');
       return;
     }
 
@@ -353,6 +392,7 @@ export default function App() {
         cargarProductos();
         setReabastecerProductoId('');
         setReabastecerCantidad('');
+        setReabastecerProductoNombre('');
       } else {
         throw new Error('Error al actualizar inventario');
       }
@@ -364,13 +404,14 @@ export default function App() {
       Alert.alert('Stock Incrementado (Modo Local)', `Se sumaron ${cantidadSumar} unidades al componente con ID ${prodId}.`);
       setReabastecerProductoId('');
       setReabastecerCantidad('');
+      setReabastecerProductoNombre('');
     }
   };
 
   // Inserta un nuevo producto en la tabla productos de la base de datos
   const guardarNuevoProducto = async () => {
     if (!nuevoNombre || !nuevoDescripcion || !nuevoStock || !nuevoCosto || !nuevoGanancia || !nuevoCategoriaId) {
-      Alert.alert('Formulario Incompleto', 'Por favor completa todos los campos del nuevo producto.');
+      Alert.alert('Formulario Incompleto', 'Por favor selecciona una categoría y completa todos los campos del nuevo producto.');
       return;
     }
 
@@ -387,7 +428,8 @@ export default function App() {
         stock: stockVal,
         precio_costo: costoVal,
         margen_ganancia: gananciaVal,
-        categorias_id: categoriaIdVal
+        categorias_id: categoriaIdVal,
+        imagen: nuevoImagen || null
       });
 
       if (res.success) {
@@ -398,18 +440,21 @@ export default function App() {
         setNuevoCosto('');
         setNuevoGanancia('');
         setNuevoCategoriaId('');
+        setNuevoImagen('');
         cargarProductos();
       } else {
         throw new Error(res.error || 'Error al guardar');
       }
     } catch (error) {
+      const catDesc = dbCategorias.find(c => c.id === categoriaIdVal)?.descripcion || 'Accesorios';
       const simulado = {
         id: productos.length + 1,
         nombre: nuevoNombre,
         descripcion: nuevoDescripcion,
         stock: stockVal,
         precio: precioFinal,
-        categoria_nombre: CATEGORIAS[categoriaIdVal] || 'Accesorios'
+        categoria_nombre: catDesc,
+        imagen: nuevoImagen || null
       };
       setProductos([...productos, simulado]);
       Alert.alert('Producto Agregado (Modo Local)', `Se guardó el componente localmente: ${nuevoNombre}`);
@@ -419,6 +464,103 @@ export default function App() {
       setNuevoCosto('');
       setNuevoGanancia('');
       setNuevoCategoriaId('');
+      setNuevoImagen('');
+    }
+  };
+
+  // Envía la nueva categoría al backend
+  const manejarGuardarCategoria = async () => {
+    if (!nuevaCategoriaDescripcion) {
+      Alert.alert('Campo Requerido', 'Por favor ingresa la descripción de la categoría.');
+      return;
+    }
+
+    try {
+      const res = await apiService.post('/categorias', { descripcion: nuevaCategoriaDescripcion });
+      if (res.success) {
+        Alert.alert('Categoría Creada', `La categoría "${nuevaCategoriaDescripcion}" ha sido agregada.`);
+        setNuevaCategoriaDescripcion('');
+        setMostrarNuevaCategoriaForm(false);
+        await cargarCategorias();
+        if (res.id) {
+          setNuevoCategoriaId(res.id);
+        }
+      } else {
+        throw new Error('Error al registrar categoría');
+      }
+    } catch (error) {
+      const nuevoIdSimulado = dbCategorias.length + 1;
+      const nuevaCatSimulada = { id: nuevoIdSimulado, descripcion: nuevaCategoriaDescripcion };
+      setDbCategorias([...dbCategorias, nuevaCatSimulada]);
+      setNuevoCategoriaId(nuevoIdSimulado);
+      Alert.alert('Categoría Creada (Modo Local)', `Se agregó "${nuevaCategoriaDescripcion}" localmente.`);
+      setNuevaCategoriaDescripcion('');
+      setMostrarNuevaCategoriaForm(false);
+    }
+  };
+
+  // Envía los cambios del producto editado al backend
+  const guardarEdicionProducto = async () => {
+    if (!editProductoId || !editNombre || !editDescripcion || !editCosto || !editGanancia || !editCategoriaId) {
+      Alert.alert('Formulario Incompleto', 'Por favor selecciona un producto y rellena todos los campos.');
+      return;
+    }
+
+    const prodId = parseInt(editProductoId);
+    const costoVal = parseFloat(editCosto);
+    const gananciaVal = parseFloat(editGanancia);
+    const categoriaIdVal = parseInt(editCategoriaId);
+    const precioFinal = costoVal + gananciaVal;
+
+    try {
+      const res = await apiService.put(`/productos/${prodId}`, {
+        nombre: editNombre,
+        descripcion: editDescripcion,
+        precio_costo: costoVal,
+        margen_ganancia: gananciaVal,
+        categorias_id: categoriaIdVal,
+        imagen: editImagen || null
+      });
+
+      if (res.success) {
+        Alert.alert('Producto Actualizado', 'El componente se ha modificado en la base de datos MySQL.');
+        setEditProductoId('');
+        setEditNombre('');
+        setEditDescripcion('');
+        setEditCosto('');
+        setEditGanancia('');
+        setEditCategoriaId('');
+        setEditImagen('');
+        cargarProductos();
+      } else {
+        throw new Error('Error al actualizar producto');
+      }
+    } catch (error) {
+      // Modo local simulado
+      const nuevosProductos = productos.map(prod =>
+        prod.id === prodId
+          ? {
+              ...prod,
+              nombre: editNombre,
+              descripcion: editDescripcion,
+              precio_costo: costoVal,
+              margen_ganancia: gananciaVal,
+              precio: precioFinal,
+              categorias_id: categoriaIdVal,
+              categoria_nombre: dbCategorias.find(c => c.id === categoriaIdVal)?.descripcion || prod.categoria_nombre,
+              imagen: editImagen || null
+            }
+          : prod
+      );
+      setProductos(nuevosProductos);
+      Alert.alert('Producto Modificado (Modo Local)', `Se actualizó el componente localmente: ${editNombre}`);
+      setEditProductoId('');
+      setEditNombre('');
+      setEditDescripcion('');
+      setEditCosto('');
+      setEditGanancia('');
+      setEditCategoriaId('');
+      setEditImagen('');
     }
   };
 
@@ -548,15 +690,32 @@ export default function App() {
     ? productos
     : productos.filter(p => p.categoria_nombre === categoriaSeleccionada);
 
+  // Filtra el inventario en la sección de reabastecimiento
+  const productosFiltradosReabastecer = productos.filter(p => {
+    const coincideNombre = (p.nombre || '').toLowerCase().includes(filtroNombreReabastecer.toLowerCase());
+    const coincideCategoria = filtroCategoriaReabastecer === 'Todas' || p.categoria_nombre === filtroCategoriaReabastecer;
+    return coincideNombre && coincideCategoria;
+  });
+
+  // Filtra el inventario en la sección de edición
+  const productosFiltradosEdit = productos.filter(p => {
+    const coincideNombre = (p.nombre || '').toLowerCase().includes(filtroNombreEdit.toLowerCase());
+    const coincideCategoria = filtroCategoriaEdit === 'Todas' || p.categoria_nombre === filtroCategoriaEdit;
+    return coincideNombre && coincideCategoria;
+  });
+
   // Renderiza una tarjeta de producto
   const renderProducto = ({ item }) => {
     const estaAgotado = item.stock <= 0;
+    const imagenSource = (item.imagen && item.imagen.trim() !== '')
+      ? { uri: item.imagen }
+      : (IMAGENES_PRODUCTOS[item.id] || IMAGEN_DEFAULT);
 
     return (
       <View style={styles.tarjetaProducto}>
-        <Image 
-          source={IMAGENES_PRODUCTOS[item.id] || IMAGEN_DEFAULT} 
-          style={styles.imagenProducto} 
+        <Image
+          source={imagenSource}
+          style={styles.imagenProducto}
         />
         <View style={styles.infoTarjeta}>
           <Text style={styles.categoriaTexto}>{item.categoria_nombre}</Text>
@@ -604,6 +763,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="ejemplo@hardwarestore.com"
+              placeholderTextColor="#94a3b8"
               value={loginEmail}
               onChangeText={setLoginEmail}
               autoCapitalize="none"
@@ -613,6 +773,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="••••••••"
+              placeholderTextColor="#94a3b8"
               secureTextEntry={true}
               value={loginPassword}
               onChangeText={setLoginPassword}
@@ -629,7 +790,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.contenedorPrincipal}>
       <ExpoStatusBar style="dark" />
-      
+
       <View style={styles.header}>
         <View style={styles.headerFilaSuperior}>
           <Text style={styles.headerTitulo}>PC Builder Express</Text>
@@ -673,6 +834,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="Juan Pérez"
+              placeholderTextColor="#94a3b8"
               value={checkoutNombre}
               onChangeText={setCheckoutNombre}
             />
@@ -680,6 +842,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="juan@ejemplo.com"
+              placeholderTextColor="#94a3b8"
               value={checkoutEmail}
               onChangeText={setCheckoutEmail}
               autoCapitalize="none"
@@ -689,6 +852,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="Ej: 1-1234-5678"
+              placeholderTextColor="#94a3b8"
               value={checkoutCedula}
               onChangeText={setCheckoutCedula}
             />
@@ -696,6 +860,7 @@ export default function App() {
             <TextInput
               style={styles.formInput}
               placeholder="Ej: 8888-8888"
+              placeholderTextColor="#94a3b8"
               value={checkoutTelefono}
               onChangeText={setCheckoutTelefono}
               keyboardType="phone-pad"
@@ -738,30 +903,38 @@ export default function App() {
       {sesion === 'admin' ? (
         <View style={styles.contenedorAdminPanel}>
           <View style={styles.contenedorFichas}>
-            <TouchableOpacity
-              style={[styles.fichaBoton, pestanaAdmin === 'ordenes' && styles.fichaBotonActiva]}
-              onPress={() => setPestanaAdmin('ordenes')}
-            >
-              <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'ordenes' && styles.fichaBotonTextoActiva]}>Historial Órdenes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.fichaBoton, pestanaAdmin === 'reabastecer' && styles.fichaBotonActiva]}
-              onPress={() => setPestanaAdmin('reabastecer')}
-            >
-              <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'reabastecer' && styles.fichaBotonTextoActiva]}>Reabastecer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.fichaBoton, pestanaAdmin === 'agregar' && styles.fichaBotonActiva]}
-              onPress={() => setPestanaAdmin('agregar')}
-            >
-              <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'agregar' && styles.fichaBotonTextoActiva]}>Nuevo Producto</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.fichaBoton, pestanaAdmin === 'personal' && styles.fichaBotonActiva]}
-              onPress={() => setPestanaAdmin('personal')}
-            >
-              <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'personal' && styles.fichaBotonTextoActiva]}>Registrar Personal</Text>
-            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 0 }}>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'ordenes' && styles.fichaBotonActiva, { minWidth: 120 }]}
+                onPress={() => setPestanaAdmin('ordenes')}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'ordenes' && styles.fichaBotonTextoActiva]}>Historial Órdenes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'reabastecer' && styles.fichaBotonActiva, { minWidth: 100 }]}
+                onPress={() => setPestanaAdmin('reabastecer')}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'reabastecer' && styles.fichaBotonTextoActiva]}>Reabastecer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'agregar' && styles.fichaBotonActiva, { minWidth: 120 }]}
+                onPress={() => setPestanaAdmin('agregar')}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'agregar' && styles.fichaBotonTextoActiva]}>Nuevo Producto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'editar' && styles.fichaBotonActiva, { minWidth: 120 }]}
+                onPress={() => setPestanaAdmin('editar')}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'editar' && styles.fichaBotonTextoActiva]}>Editar Producto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'personal' && styles.fichaBotonActiva, { minWidth: 130 }]}
+                onPress={() => setPestanaAdmin('personal')}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'personal' && styles.fichaBotonTextoActiva]}>Registrar Personal</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
 
           {pestanaAdmin === 'ordenes' && (
@@ -774,46 +947,270 @@ export default function App() {
           )}
 
           {pestanaAdmin === 'reabastecer' && (
-            <ScrollView style={{ marginTop: 10 }}>
+            <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
+              {/* Formulario de Reabastecimiento */}
               <View style={styles.formularioTarjeta}>
-                <Text style={styles.formEtiqueta}>ID del Componente de PC</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="Ej: 1"
-                  keyboardType="numeric"
-                  value={reabastecerProductoId}
-                  onChangeText={setReabastecerProductoId}
-                />
+                <Text style={styles.formEtiqueta}>Componente Seleccionado</Text>
+                <Text style={[styles.nombreTexto, { color: reabastecerProductoNombre ? '#10b981' : '#f87171', marginVertical: 6 }]}>
+                  {reabastecerProductoNombre ? `ID ${reabastecerProductoId}: ${reabastecerProductoNombre}` : 'Ninguno (Selecciona un componente de la lista abajo)'}
+                </Text>
+
                 <Text style={styles.formEtiqueta}>Cantidad de Stock a Añadir</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 10"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={reabastecerCantidad}
                   onChangeText={setReabastecerCantidad}
                 />
-                <TouchableOpacity style={styles.botonAccionPrincipal} onPress={manejarReabastecimiento}>
+                <TouchableOpacity 
+                  style={[styles.botonAccionPrincipal, !reabastecerProductoId && { backgroundColor: '#475569' }]} 
+                  onPress={manejarReabastecimiento}
+                  disabled={!reabastecerProductoId}
+                >
                   <Text style={styles.botonAccionPrincipalTexto}>Incrementar Stock</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.seccionTitulo}>Inventario de Referencia</Text>
-              {productos.map(p => (
-                <View key={p.id} style={styles.tarjetaProductoReferencia}>
-                  <Text style={styles.nombreTexto}>ID {p.id}: {p.nombre}</Text>
-                  <Text style={styles.stockTexto}>Stock Actual: {p.stock} uds</Text>
-                </View>
-              ))}
+              {/* Filtros de Búsqueda */}
+              <Text style={styles.seccionTitulo}>Buscar Componente</Text>
+              
+              <Text style={styles.formEtiqueta}>Filtrar por Nombre</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Escribe el nombre a buscar..."
+                placeholderTextColor="#94a3b8"
+                value={filtroNombreReabastecer}
+                onChangeText={setFiltroNombreReabastecer}
+              />
+
+              <Text style={styles.formEtiqueta}>Filtrar por Categoría</Text>
+              <View style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                  {['Todas', ...dbCategorias.map(c => c.descripcion)].map(cat => {
+                    const esActivo = filtroCategoriaReabastecer === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.botonCategoriaOption,
+                          esActivo ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
+                        ]}
+                        onPress={() => setFiltroCategoriaReabastecer(cat)}
+                      >
+                        <Text style={esActivo ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Inventario de Referencia Filtrado */}
+              <Text style={styles.seccionTitulo}>Seleccionar Componente ({productosFiltradosReabastecer.length})</Text>
+              {productosFiltradosReabastecer.map(p => {
+                const seleccionado = reabastecerProductoId === p.id.toString();
+                return (
+                  <TouchableOpacity 
+                    key={p.id} 
+                    style={[
+                      styles.tarjetaProductoReferencia, 
+                      seleccionado && { borderColor: '#10b981', borderLeftColor: '#10b981', borderWidth: 2 }
+                    ]}
+                    onPress={() => {
+                      setReabastecerProductoId(p.id.toString());
+                      setReabastecerProductoNombre(p.nombre);
+                    }}
+                  >
+                    <Text style={styles.nombreTexto}>ID {p.id}: {p.nombre}</Text>
+                    <Text style={[styles.stockTexto, { color: p.stock <= 0 ? '#f87171' : '#34d399' }]}>
+                      Stock Actual: {p.stock} uds ({p.categoria_nombre})
+                    </Text>
+                    {seleccionado && (
+                      <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
+                        ✓ Seleccionado para Reabastecer
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {pestanaAdmin === 'editar' && (
+            <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
+              {/* Formulario de Edición */}
+              <View style={styles.formularioTarjeta}>
+                <Text style={styles.formEtiqueta}>Componente Seleccionado</Text>
+                <Text style={[styles.nombreTexto, { color: editNombre ? '#10b981' : '#f87171', marginVertical: 6 }]}>
+                  {editNombre ? `ID ${editProductoId}: ${editNombre}` : 'Ninguno (Selecciona un componente de la lista abajo)'}
+                </Text>
+
+                {editProductoId ? (
+                  <>
+                    <Text style={styles.formEtiqueta}>Nombre del Componente</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="Ej: Intel Core i9-14900K"
+                      placeholderTextColor="#94a3b8"
+                      value={editNombre}
+                      onChangeText={setEditNombre}
+                    />
+
+                    <Text style={styles.formEtiqueta}>Descripción</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="Ej: Procesador potente de 24 núcleos"
+                      placeholderTextColor="#94a3b8"
+                      value={editDescripcion}
+                      onChangeText={setEditDescripcion}
+                    />
+
+                    <Text style={styles.formEtiqueta}>Precio Costo (₡)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="Ej: 250000"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="numeric"
+                      value={editCosto}
+                      onChangeText={setEditCosto}
+                    />
+
+                    <Text style={styles.formEtiqueta}>Margen de Ganancia (₡)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="Ej: 50000"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="numeric"
+                      value={editGanancia}
+                      onChangeText={setEditGanancia}
+                    />
+
+                    <Text style={styles.formEtiqueta}>Categoría</Text>
+                    <View style={{ marginBottom: 12 }}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                        {dbCategorias.map(cat => {
+                          const seleccionado = editCategoriaId === cat.id;
+                          return (
+                            <TouchableOpacity
+                              key={cat.id}
+                              style={[
+                                styles.botonCategoriaOption,
+                                seleccionado ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
+                              ]}
+                              onPress={() => setEditCategoriaId(cat.id)}
+                            >
+                              <Text style={seleccionado ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
+                                {cat.descripcion}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+
+                    <Text style={styles.formEtiqueta}>URL de la Imagen</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="https://ejemplo.com/imagen.png"
+                      placeholderTextColor="#94a3b8"
+                      value={editImagen}
+                      onChangeText={setEditImagen}
+                      autoCapitalize="none"
+                    />
+
+                    <TouchableOpacity style={styles.botonAccionPrincipal} onPress={guardarEdicionProducto}>
+                      <Text style={styles.botonAccionPrincipalTexto}>Guardar Cambios</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <Text style={[styles.descripcionTexto, { textAlign: 'center', marginTop: 10 }]}>
+                    Utiliza la sección de búsqueda abajo para seleccionar qué producto deseas modificar.
+                  </Text>
+                )}
+              </View>
+
+              {/* Filtros de Búsqueda para Editar */}
+              <Text style={styles.seccionTitulo}>Buscar Componente para Editar</Text>
+              
+              <Text style={styles.formEtiqueta}>Filtrar por Nombre</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Escribe el nombre a buscar..."
+                placeholderTextColor="#94a3b8"
+                value={filtroNombreEdit}
+                onChangeText={setFiltroNombreEdit}
+              />
+
+              <Text style={styles.formEtiqueta}>Filtrar por Categoría</Text>
+              <View style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                  {['Todas', ...dbCategorias.map(c => c.descripcion)].map(cat => {
+                    const esActivo = filtroCategoriaEdit === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.botonCategoriaOption,
+                          esActivo ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
+                        ]}
+                        onPress={() => setFiltroCategoriaEdit(cat)}
+                      >
+                        <Text style={esActivo ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Lista de Productos para Editar */}
+              <Text style={styles.seccionTitulo}>Seleccionar Componente ({productosFiltradosEdit.length})</Text>
+              {productosFiltradosEdit.map(p => {
+                const seleccionado = editProductoId === p.id.toString();
+                return (
+                  <TouchableOpacity 
+                    key={p.id} 
+                    style={[
+                      styles.tarjetaProductoReferencia, 
+                      seleccionado && { borderColor: '#10b981', borderLeftColor: '#10b981', borderWidth: 2 }
+                    ]}
+                    onPress={() => {
+                      setEditProductoId(p.id.toString());
+                      setEditNombre(p.nombre);
+                      setEditDescripcion(p.descripcion);
+                      setEditCosto(p.precio_costo ? p.precio_costo.toString() : '');
+                      setEditGanancia(p.margen_ganancia ? p.margen_ganancia.toString() : '');
+                      setEditCategoriaId(p.categorias_id || '');
+                      setEditImagen(p.imagen || '');
+                    }}
+                  >
+                    <Text style={styles.nombreTexto}>ID {p.id}: {p.nombre}</Text>
+                    <Text style={styles.stockTexto}>
+                      Precio Final: ₡{Number(p.precio || (p.precio_costo + p.margen_ganancia) || 0).toFixed(2)} ({p.categoria_nombre})
+                    </Text>
+                    {seleccionado && (
+                      <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
+                        ✓ Cargado en el Editor
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
 
           {pestanaAdmin === 'agregar' && (
-            <ScrollView style={{ marginTop: 10 }}>
+            <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
               <View style={styles.formularioTarjeta}>
                 <Text style={styles.formEtiqueta}>Nombre del Componente</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: Intel Core i9-14900K"
+                  placeholderTextColor="#94a3b8"
                   value={nuevoNombre}
                   onChangeText={setNuevoNombre}
                 />
@@ -821,6 +1218,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: Procesador potente de 24 núcleos"
+                  placeholderTextColor="#94a3b8"
                   value={nuevoDescripcion}
                   onChangeText={setNuevoDescripcion}
                 />
@@ -828,6 +1226,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 10"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={nuevoStock}
                   onChangeText={setNuevoStock}
@@ -836,6 +1235,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 250000"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={nuevoCosto}
                   onChangeText={setNuevoCosto}
@@ -844,18 +1244,69 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 50000"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={nuevoGanancia}
                   onChangeText={setNuevoGanancia}
                 />
-                <Text style={styles.formEtiqueta}>Categoría ID</Text>
+                <Text style={styles.formEtiqueta}>Seleccionar Categoría</Text>
+                <View style={{ marginBottom: 12 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                    {dbCategorias.map(cat => {
+                      const seleccionado = nuevoCategoriaId === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[
+                            styles.botonCategoriaOption,
+                            seleccionado ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
+                          ]}
+                          onPress={() => setNuevoCategoriaId(cat.id)}
+                        >
+                          <Text style={seleccionado ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
+                            {cat.descripcion}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.botonCrearNuevaCategoriaToggle}
+                  onPress={() => setMostrarNuevaCategoriaForm(!mostrarNuevaCategoriaForm)}
+                >
+                  <Text style={styles.botonCrearNuevaCategoriaToggleTexto}>
+                    {mostrarNuevaCategoriaForm ? 'Cancelar Creación de Categoría' : '➕ Registrar Nueva Categoría'}
+                  </Text>
+                </TouchableOpacity>
+
+                {mostrarNuevaCategoriaForm && (
+                  <View style={styles.subFormularioTarjeta}>
+                    <Text style={styles.subFormEtiqueta}>Nombre de la Nueva Categoría</Text>
+                    <TextInput
+                      style={styles.subFormInput}
+                      placeholder="Ej: Fuentes de Poder"
+                      placeholderTextColor="#94a3b8"
+                      value={nuevaCategoriaDescripcion}
+                      onChangeText={setNuevaCategoriaDescripcion}
+                    />
+                    <TouchableOpacity style={styles.botonSubAccion} onPress={manejarGuardarCategoria}>
+                      <Text style={styles.botonSubAccionTexto}>Guardar Categoría</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <Text style={styles.formEtiqueta}>URL de la Imagen (Opcional)</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Ej: 1 (Procesadores)"
-                  keyboardType="numeric"
-                  value={nuevoCategoriaId}
-                  onChangeText={setNuevoCategoriaId}
+                  placeholder="https://ejemplo.com/imagen.png"
+                  placeholderTextColor="#94a3b8"
+                  value={nuevoImagen}
+                  onChangeText={setNuevoImagen}
+                  autoCapitalize="none"
                 />
+
                 <TouchableOpacity style={styles.botonAccionPrincipal} onPress={guardarNuevoProducto}>
                   <Text style={styles.botonAccionPrincipalTexto}>Guardar en Inventario</Text>
                 </TouchableOpacity>
@@ -864,12 +1315,13 @@ export default function App() {
           )}
 
           {pestanaAdmin === 'personal' && (
-            <ScrollView style={{ marginTop: 10 }}>
+            <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }}>
               <View style={styles.formularioTarjeta}>
                 <Text style={styles.formEtiqueta}>Correo Electrónico de Empleado</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="empleado@hardwarestore.com"
+                  placeholderTextColor="#94a3b8"
                   autoCapitalize="none"
                   keyboardType="email-address"
                   value={empEmail}
@@ -879,6 +1331,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="••••••••"
+                  placeholderTextColor="#94a3b8"
                   secureTextEntry={true}
                   value={empPassword}
                   onChangeText={setEmpPassword}
@@ -887,6 +1340,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 2"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={empRolId}
                   onChangeText={setEmpRolId}
@@ -984,11 +1438,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitulo: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '900',
     color: '#3b82f6',
-    letterSpacing: 1.5,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
+    flex: 1,
+    marginRight: 10,
   },
   botonAccesoHeader: {
     backgroundColor: '#3b82f6',
@@ -1243,9 +1699,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   stockTexto: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
+    color: '#94a3b8',
   },
   stockDisponible: {
     color: '#34d399',
@@ -1499,5 +1956,85 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
     letterSpacing: 0.5,
+  },
+  botonCategoriaOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botonCategoriaOptionActivo: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#60a5fa',
+  },
+  botonCategoriaOptionInactivo: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  textoCategoriaOptionActivo: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  textoCategoriaOptionInactivo: {
+    color: '#94a3b8',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  botonCrearNuevaCategoriaToggle: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  botonCrearNuevaCategoriaToggleTexto: {
+    color: '#3b82f6',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  subFormularioTarjeta: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  subFormEtiqueta: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#38bdf8',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  subFormInput: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    fontSize: 14,
+    color: '#ffffff',
+  },
+  botonSubAccion: {
+    backgroundColor: '#10b981',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  botonSubAccionTexto: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13,
   },
 });
