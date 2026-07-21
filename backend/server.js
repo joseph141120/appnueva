@@ -30,7 +30,7 @@ const registerRoutes = (path, method, handler) => {
 
 // Endpoint GET /productos: Trae los componentes realizando un JOIN con categorías
 registerRoutes('/productos', 'get', (req, res) => {
-  const query = "SELECT p.id, p.nombre, p.descripcion, p.stock, p.precio_costo, p.margen_ganancia, p.imagen, c.descripcion AS categoria_nombre FROM productos p JOIN categorias c ON p.categorias_id = c.id";
+  const query = "SELECT p.id, p.nombre, p.descripcion, p.stock, p.precio_costo, p.margen_ganancia, p.imagen, p.descuento_porcentaje, COALESCE(c.descripcion, 'Accesorios') AS categoria_nombre FROM productos p LEFT JOIN categorias c ON p.categorias_id = c.id";
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json(results);
@@ -39,9 +39,9 @@ registerRoutes('/productos', 'get', (req, res) => {
 
 // Endpoint POST /productos: Inserta nuevos productos en la base de datos
 registerRoutes('/productos', 'post', (req, res) => {
-  const { nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen } = req.body;
-  const query = 'INSERT INTO productos (nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen) VALUES (?, ?, ?, ?, ?, ?, ?)';
-  db.query(query, [nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen || null], (err, result) => {
+  const { nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen, descuento_porcentaje } = req.body;
+  const query = 'INSERT INTO productos (nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen, descuento_porcentaje) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+  db.query(query, [nombre, descripcion, stock, precio_costo, margen_ganancia, categorias_id, imagen || null, descuento_porcentaje || 0], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, message: 'Producto insertado en MySQL', id: result.insertId });
   });
@@ -79,9 +79,9 @@ registerRoutes('/productos/:id/reabastecer', 'put', (req, res) => {
 // Endpoint PUT /productos/:id: Actualiza detalles de un producto existente
 registerRoutes('/productos/:id', 'put', (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen } = req.body;
-  const query = 'UPDATE productos SET nombre = ?, descripcion = ?, precio_costo = ?, margen_ganancia = ?, categorias_id = ?, imagen = ? WHERE id = ?';
-  db.query(query, [nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen || null, id], (err, result) => {
+  const { nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen, descuento_porcentaje } = req.body;
+  const query = 'UPDATE productos SET nombre = ?, descripcion = ?, precio_costo = ?, margen_ganancia = ?, categorias_id = ?, imagen = ?, descuento_porcentaje = ? WHERE id = ?';
+  db.query(query, [nombre, descripcion, precio_costo, margen_ganancia, categorias_id, imagen || null, descuento_porcentaje || 0, id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, message: 'Producto actualizado exitosamente en MySQL' });
   });
@@ -123,6 +123,60 @@ registerRoutes('/usuarios/registro', 'post', (req, res) => {
   });
 });
 
+// Endpoint POST /recuperar-password: Genera un código de verificación para recuperar contraseña por correo
+registerRoutes('/recuperar-password', 'post', (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, message: 'Correo electrónico requerido' });
+
+  db.query('SELECT id, email FROM usuarios WHERE LOWER(email) = LOWER(?)', [email], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (!results || results.length === 0) {
+      return res.status(404).json({ success: false, message: 'No existe una cuenta registrada con este correo electrónico.' });
+    }
+
+    const codigoHex = Math.floor(100000 + Math.random() * 900000).toString();
+    db.query('UPDATE usuarios SET token_recuperacion = ? WHERE id = ?', [codigoHex, results[0].id], (errUpd) => {
+      if (errUpd) return res.status(500).json({ success: false, error: errUpd.message });
+      console.log(`📩 Simulación de correo enviado a ${email}: Su código de recuperación de contraseña es: ${codigoHex}`);
+      return res.json({
+        success: true,
+        message: `Código de recuperación enviado al correo ${email}.`,
+        codigoSimulado: codigoHex
+      });
+    });
+  });
+});
+
+// Endpoint POST /resetear-password: Valida el código y actualiza la contraseña en MySQL
+registerRoutes('/resetear-password', 'post', async (req, res) => {
+  const { email, codigo, nueva_password } = req.body;
+  if (!email || !codigo || !nueva_password) {
+    return res.status(400).json({ success: false, message: 'Todos los campos son requeridos.' });
+  }
+
+  db.query('SELECT id, token_recuperacion FROM usuarios WHERE LOWER(email) = LOWER(?)', [email], async (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (!results || results.length === 0) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+    }
+
+    const usuario = results[0];
+    if (!usuario.token_recuperacion || usuario.token_recuperacion.trim() !== codigo.toString().trim()) {
+      return res.status(400).json({ success: false, message: 'Código de verificación incorrecto o expirado.' });
+    }
+
+    try {
+      const hash = await bcrypt.hash(nueva_password, 10);
+      db.query('UPDATE usuarios SET password = ?, token_recuperacion = NULL WHERE id = ?', [hash, usuario.id], (errUpd) => {
+        if (errUpd) return res.status(500).json({ success: false, error: errUpd.message });
+        return res.json({ success: true, message: 'Contraseña restablecida exitosamente.' });
+      });
+    } catch (e) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+});
+
 // Endpoint POST /clientes: Guarda un cliente en la tabla 'cliente' (sin contraseñas)
 registerRoutes('/clientes', 'post', (req, res) => {
   const { nombre, email, cedula, telefono } = req.body;
@@ -133,108 +187,86 @@ registerRoutes('/clientes', 'post', (req, res) => {
   });
 });
 
-// Endpoint POST /vender: Procesa la compra mediante Transacciones SQL
-registerRoutes('/vender', 'post', (req, res) => {
-  const { usuario_email, detalles } = req.body;
+// Endpoint POST /vender: Procesa la compra mediante Transacciones SQL secuenciales con Async/Await
+registerRoutes('/vender', 'post', async (req, res) => {
+  const { usuario_email, detalles, tipo_orden } = req.body;
+  const esEnsambleAuto = (tipo_orden === 'ensamble') || 
+                         (detalles && Array.isArray(detalles) && detalles.some(d => d.producto_id === 9999));
+  const ordenTipo = esEnsambleAuto ? 'ensamble' : 'venta';
 
-  // Busca cliente_id a partir de usuario_email, default a Cliente General (ID 1)
-  db.query('SELECT id FROM cliente WHERE correo = ?', [usuario_email], (err, clientResults) => {
+  if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+    return res.status(400).json({ success: false, error: 'Detalles de la venta requeridos.' });
+  }
+
+  const queryPromise = (conn, sql, params) => new Promise((resolve, reject) => {
+    conn.query(sql, params, (err, results) => {
+      if (err) reject(err);
+      else resolve(results);
+    });
+  });
+
+  let connection;
+  try {
+    // 1. Obtener cliente_id a partir de usuario_email
+    const clientResults = await queryPromise(db, 'SELECT id FROM cliente WHERE correo = ?', [usuario_email]);
     let cliente_id = 1;
-    if (!err && clientResults && clientResults.length > 0) {
+    if (clientResults && clientResults.length > 0) {
       cliente_id = clientResults[0].id;
     }
 
-    db.getConnection((err, connection) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-
-      connection.beginTransaction(err => {
-        if (err) {
-          connection.release();
-          return res.status(500).json({ success: false, error: err.message });
-        }
-
-        // 1. Registrar la venta en la tabla maestra 'ventas' (id, fecha, condicion_venta, estado)
-        const estadoInicial = usuario_email === 'vendedor@hardwarestore.com' ? 'Completado' : 'En Proceso';
-        const queryVenta = 'INSERT INTO ventas (fecha, condicion_venta, estado) VALUES (NOW(), "Contado", ?)';
-        connection.query(queryVenta, [estadoInicial], (err, resultVenta) => {
-          if (err) {
-            return connection.rollback(() => {
-              connection.release();
-              res.status(500).json({ success: false, error: err.message });
-            });
-          }
-
-          const ventaId = resultVenta.insertId;
-          let queriesCompleted = 0;
-          const totalDetails = detalles.length;
-
-          if (totalDetails === 0) {
-            return connection.commit(err => {
-              if (err) {
-                return connection.rollback(() => {
-                  connection.release();
-                  res.status(500).json({ success: false, error: err.message });
-                });
-              }
-              connection.release();
-              res.json({ success: true, ventaId });
-            });
-          }
-
-          // 2. Insertar desglose en 'detalle_venta' y decrementar stock en 'productos'
-          detalles.forEach(item => {
-            const checkStockQuery = 'SELECT stock, precio_costo, margen_ganancia FROM productos WHERE id = ?';
-            connection.query(checkStockQuery, [item.producto_id], (err, stockResult) => {
-              if (err || stockResult.length === 0 || stockResult[0].stock < item.cantidad) {
-                return connection.rollback(() => {
-                  connection.release();
-                  res.status(400).json({ success: false, error: 'Stock insuficiente o producto inexistente.' });
-                });
-              }
-
-              const prod = stockResult[0];
-              const precioUnitario = prod.precio_costo + prod.margen_ganancia;
-
-              // Insertar en detalle_venta utilizando columnas correctas (cliente_id, precio)
-              const queryDetail = 'INSERT INTO detalle_venta (cliente_id, ventas_id, productos_id, cantidad, precio) VALUES (?, ?, ?, ?, ?)';
-              connection.query(queryDetail, [cliente_id, ventaId, item.producto_id, item.cantidad, precioUnitario], (err) => {
-                if (err) {
-                  return connection.rollback(() => {
-                    connection.release();
-                    res.status(500).json({ success: false, error: err.message });
-                  });
-                }
-
-                const queryUpdateStock = 'UPDATE productos SET stock = stock - ? WHERE id = ?';
-                connection.query(queryUpdateStock, [item.cantidad, item.producto_id], (err) => {
-                  if (err) {
-                    return connection.rollback(() => {
-                      connection.release();
-                      res.status(500).json({ success: false, error: err.message });
-                    });
-                  }
-
-                  queriesCompleted++;
-                  if (queriesCompleted === totalDetails) {
-                    connection.commit(err => {
-                      if (err) {
-                        return connection.rollback(() => {
-                          connection.release();
-                          res.status(500).json({ success: false, error: err.message });
-                        });
-                      }
-                      connection.release();
-                      res.json({ success: true, ventaId });
-                    });
-                  }
-                });
-              });
-            });
-          });
-        });
-      });
+    // 2. Conexión de transacción
+    connection = await new Promise((resolve, reject) => {
+      db.getConnection((err, conn) => err ? reject(err) : resolve(conn));
     });
-  });
+
+    await new Promise((resolve, reject) => {
+      connection.beginTransaction(err => err ? reject(err) : resolve());
+    });
+
+    const estadoInicial = usuario_email === 'vendedor@hardwarestore.com' ? 'Completado' : 'En Proceso';
+    const queryVenta = 'INSERT INTO ventas (fecha, condicion_venta, estado, tipo_orden) VALUES (NOW(), "Contado", ?, ?)';
+    const resultVenta = await queryPromise(connection, queryVenta, [estadoInicial, ordenTipo]);
+    const ventaId = resultVenta.insertId;
+
+    // 3. Procesar cada componente secuencialmente soportando ítems de ensamble virtual
+    for (const item of detalles) {
+      let precioUnitario = 0;
+      const esVirtual = item.producto_id === 9999;
+
+      if (esVirtual) {
+        precioUnitario = 15000;
+      } else {
+        const checkStockQuery = 'SELECT stock, precio_costo, margen_ganancia FROM productos WHERE id = ?';
+        const stockResult = await queryPromise(connection, checkStockQuery, [item.producto_id]);
+
+        if (stockResult && stockResult.length > 0) {
+          const prod = stockResult[0];
+          precioUnitario = (Number(prod.precio_costo) || 0) + (Number(prod.margen_ganancia) || 0);
+          const queryUpdateStock = 'UPDATE productos SET stock = stock - ? WHERE id = ?';
+          await queryPromise(connection, queryUpdateStock, [item.cantidad, item.producto_id]);
+        } else {
+          precioUnitario = item.precio || 0;
+        }
+      }
+
+      const queryDetail = 'INSERT INTO detalle_venta (cliente_id, ventas_id, productos_id, cantidad, precio) VALUES (?, ?, ?, ?, ?)';
+      await queryPromise(connection, queryDetail, [cliente_id, ventaId, esVirtual ? null : item.producto_id, item.cantidad, precioUnitario]);
+    }
+
+    // 4. Finalizar transacción
+    await new Promise((resolve, reject) => {
+      connection.commit(err => err ? reject(err) : resolve());
+    });
+
+    connection.release();
+    return res.json({ success: true, ventaId });
+  } catch (error) {
+    if (connection) {
+      connection.rollback(() => connection.release());
+    }
+    console.error('Error en /vender:', error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Endpoint GET /ventas: Historial de la tabla maestra de ventas con sumatoria, descripciones y datos del cliente
@@ -245,11 +277,12 @@ registerRoutes('/ventas', 'get', (req, res) => {
       v.fecha, 
       v.condicion_venta, 
       v.estado, 
+      v.tipo_orden,
       SUM(d.cantidad * d.precio) AS total,
       c.nombre_completo AS cliente_nombre,
       c.correo AS cliente_correo,
       c.telefono AS cliente_telefono,
-      GROUP_CONCAT(CONCAT(d.cantidad, 'x ', p.nombre) SEPARATOR ', ') AS descripcion
+      GROUP_CONCAT(CONCAT(d.cantidad, 'x ', COALESCE(p.nombre, 'Servicio de Ensamble de PC')) SEPARATOR ', ') AS descripcion
     FROM ventas v 
     LEFT JOIN detalle_venta d ON v.id = d.ventas_id 
     LEFT JOIN productos p ON d.productos_id = p.id
@@ -260,6 +293,35 @@ registerRoutes('/ventas', 'get', (req, res) => {
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json(results);
+  });
+});
+
+// Endpoint GET /ventas/:id: Retorna una sola venta para el rastreo del cliente
+registerRoutes('/ventas/:id', 'get', (req, res) => {
+  const { id } = req.params;
+  const query = `
+    SELECT 
+      v.id, 
+      v.fecha, 
+      v.condicion_venta, 
+      v.estado, 
+      v.tipo_orden,
+      SUM(d.cantidad * d.precio) AS total,
+      c.nombre_completo AS cliente_nombre,
+      c.correo AS cliente_correo,
+      c.telefono AS cliente_telefono,
+      GROUP_CONCAT(CONCAT(d.cantidad, 'x ', p.nombre) SEPARATOR ', ') AS descripcion
+    FROM ventas v 
+    LEFT JOIN detalle_venta d ON v.id = d.ventas_id 
+    LEFT JOIN productos p ON d.productos_id = p.id
+    LEFT JOIN cliente c ON d.cliente_id = c.id
+    WHERE v.id = ?
+    GROUP BY v.id
+  `;
+  db.query(query, [id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'Orden no encontrada' });
+    res.json(results[0]);
   });
 });
 
