@@ -28,6 +28,7 @@ const IMAGEN_DEFAULT = require('./assets/icon.png');
 
 // Importación del servicio centralizado de la API y manejador de token en memoria
 import { apiService, setAuthToken } from './src/services/api';
+import PantallaPagoTilopay from './src/screens/PantallaPagoTilopay';
 
 // Configuración de la URL de red propia
 const API_URL = 'http://localhost:3000';
@@ -170,6 +171,10 @@ export default function App() {
   const [checkoutCedula, setCheckoutCedula] = useState('');
   const [checkoutTelefono, setCheckoutTelefono] = useState('');
 
+  // Estados para la Pasarela de Pagos Tilopay (Modo Sandbox via WebView)
+  const [mostrarTilopayModal, setMostrarTilopayModal] = useState(false);
+  const [datosPagoTilopay, setDatosPagoTilopay] = useState(null);
+
   // Buscador de la Tabla de Ventas
   const [filtroTablaVentas, setFiltroTablaVentas] = useState('');
 
@@ -211,6 +216,7 @@ export default function App() {
   const [filtroCategoriaEdit, setFiltroCategoriaEdit] = useState('Todas');
   const [isOffline, setIsOffline] = useState(false);
   const [productoSeleccionadoDetalle, setProductoSeleccionadoDetalle] = useState(null);
+  const [ordenSeleccionadaDetalle, setOrdenSeleccionadaDetalle] = useState(null);
 
   // Estados para el Rastreador de Órdenes del Cliente
   const [rastrearCodigo, setRastrearCodigo] = useState('');
@@ -290,9 +296,9 @@ export default function App() {
         };
       });
 
-      // Aseguramos que se incluyan todos los elementos mock si no están en MySQL
-      const nombresExistentes = new Set(productosConPrecio.map(p => (p.nombre || '').toLowerCase().trim()));
-      const faltantesMock = productosMockDef.filter(m => !nombresExistentes.has(m.nombre.toLowerCase().trim()));
+      // Aseguramos que se incluyan elementos mock sólo para los IDs que no existan en MySQL
+      const idsExistentes = new Set(productosConPrecio.map(p => Number(p.id)));
+      const faltantesMock = productosMockDef.filter(m => !idsExistentes.has(Number(m.id)));
       
       setProductos([...productosConPrecio, ...faltantesMock]);
       setIsOffline(false);
@@ -559,6 +565,14 @@ export default function App() {
               )}
             </View>
           )}
+
+          {/* Botón para abrir el Modal con el Desglose de Productos de la Orden */}
+          <TouchableOpacity
+            style={[styles.botonAccionOrden, { backgroundColor: '#0284c7', width: '100%', marginHorizontal: 0, paddingVertical: 12, marginBottom: 6 }]}
+            onPress={() => setOrdenSeleccionadaDetalle(item)}
+          >
+            <Text style={styles.botonAccionOrdenTexto}>👁️ Ver Detalle Completo de Productos</Text>
+          </TouchableOpacity>
 
           {/* Botón de Generar Factura PDF (Siempre visible para Administradores y Vendedores) */}
           <TouchableOpacity
@@ -1043,6 +1057,8 @@ export default function App() {
 
   // Envía la orden al endpoint /vender del backend
   const ejecutarVentaApi = async (emailCliente) => {
+    if (!carrito || carrito.length === 0) return;
+
     try {
       const res = await apiService.post('/vender', {
         usuario_email: emailCliente,
@@ -1051,16 +1067,15 @@ export default function App() {
         tipo_orden: esOrdenEnsambleActual ? 'ensamble' : 'venta'
       });
 
-      if (res.success) {
+      if (res && res.success) {
         const idOrden = res.ventaId || res.id || res.insertId || Math.floor(Math.random() * 8000) + 1000;
         finalizarVentaExito(idOrden);
       } else {
-        throw new Error('Error al procesar la venta');
+        Alert.alert('Error de Procesamiento', res?.error || res?.message || 'No se pudo procesar la venta.');
       }
     } catch (error) {
-      // Simulación de éxito offline para evitar bloqueos
-      const idSimulado = Math.floor(Math.random() * 8000) + 1000;
-      finalizarVentaExito(idSimulado);
+      console.error('Error al registrar venta:', error.message);
+      Alert.alert('Error al Registrar Venta', 'No se pudo completar el registro de la orden en el servidor.');
     }
   };
 
@@ -1104,6 +1119,68 @@ export default function App() {
 
     // Procesa la transacción de venta
     ejecutarVentaApi(checkoutEmail);
+  };
+
+  // Inicia el proceso de pago seguro en la pasarela Tilopay (Modo Sandbox via WebView)
+  const procesarPagoTilopay = () => {
+    if (!checkoutNombre || !checkoutEmail || !checkoutCedula || !checkoutTelefono) {
+      Alert.alert('Datos Requeridos', 'Por favor rellene Nombre, Correo, Cédula y Teléfono antes de procesar el pago.');
+      return;
+    }
+
+    const totalPagar = calcularTotal();
+    const idOrdenTemp = Math.floor(Math.random() * 8000) + 1000;
+    const listaProductosTexto = carrito.map(i => `${i.cantidad}x ${i.nombre} (₡${Number(i.precio * i.cantidad).toFixed(2)})`).join(', ');
+
+    setDatosPagoTilopay({
+      monto: totalPagar,
+      ordenId: idOrdenTemp,
+      clienteNombre: checkoutNombre,
+      clienteEmail: checkoutEmail,
+      clienteTelefono: checkoutTelefono,
+      descripcion: `Detalle del pedido: ${listaProductosTexto}`,
+      items: carrito
+    });
+
+    setMostrarTilopayModal(true);
+  };
+
+  // Callback al ser procesado y aprobado el pago en Tilopay WebView
+  const manejarExitoTilopay = async (resultado) => {
+    setMostrarTilopayModal(false);
+
+    try {
+      await apiService.post('/clientes', {
+        nombre: checkoutNombre,
+        email: checkoutEmail,
+        cedula: checkoutCedula,
+        telefono: checkoutTelefono
+      });
+    } catch (e) {}
+
+    // Finalizar orden
+    ejecutarVentaApi(checkoutEmail);
+  };
+
+  // Callback al cancelar el pago por el cliente
+  const manejarCancelarTilopay = () => {
+    setMostrarTilopayModal(false);
+    Alert.alert(
+      '❌ Pago Cancelado / Orden No Procesada',
+      'Has cancelado la transacción en la pasarela Tilopay. La orden NO ha sido generada y tu carrito permanece guardado.'
+    );
+    enviarNotificacionWeb('⚠️ Pago Cancelado', 'El cliente canceló la transacción en Tilopay.');
+  };
+
+  // Callback al ocurrir un error o rechazo de tarjeta en el pago
+  const manejarErrorTilopay = (error) => {
+    setMostrarTilopayModal(false);
+    const mensajeDetallado = error.error || 'La transacción fue rechazada por el banco emisor o la tarjeta no está disponible.';
+    Alert.alert(
+      '❌ Transacción Denegada / Orden Cancelada',
+      `${mensajeDetallado}\n\nLa orden NO ha sido procesada por la tienda y su carrito se mantiene intacto.`
+    );
+    enviarNotificacionWeb('🔴 Pago Rechazado / Orden Cancelada', `Transacción rechazada en Tilopay: ${mensajeDetallado}`);
   };
 
   // Añade productos al carrito
@@ -1623,19 +1700,33 @@ export default function App() {
               keyboardType="phone-pad"
             />
 
+            <Text style={[styles.formEtiqueta, { fontSize: 14, fontWeight: '900', color: '#fbbf24', marginTop: 10, marginBottom: 8, textAlign: 'center' }]}>
+              MÉTODO DE PAGO
+            </Text>
+
+            {/* Botón Principal: Pagar con Tilopay Sandbox */}
+            <TouchableOpacity
+              style={[styles.botonCheckoutForm, { backgroundColor: '#0284c7', paddingVertical: 16, marginHorizontal: 0, marginBottom: 12, borderWidth: 1.5, borderColor: '#38bdf8' }]}
+              onPress={procesarPagoTilopay}
+            >
+              <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900', color: '#ffffff' }]}>
+                💳 PAGAR CON TILOPAY (TARJETA / SANDBOX)
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.filaBotonesCheckout}>
               <TouchableOpacity
-                style={[styles.botonCheckoutForm, styles.botonCancelarCheckout, { paddingVertical: 14 }]}
+                style={[styles.botonCheckoutForm, styles.botonCancelarCheckout, { paddingVertical: 12 }]}
                 onPress={() => setMostrarFormularioFacturacion(false)}
               >
-                <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900' }]}>✕ Volver al Carrito</Text>
+                <Text style={[styles.botonCheckoutFormTexto, { fontSize: 14, fontWeight: '800' }]}>✕ Volver</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 14, backgroundColor: '#10b981' }]}
+                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 12, backgroundColor: '#10b981' }]}
                 onPress={procesarCheckoutCliente}
               >
-                <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900' }]}>✅ CONFIRMAR Y ENVIAR</Text>
+                <Text style={[styles.botonCheckoutFormTexto, { fontSize: 14, fontWeight: '800' }]}>📝 Pago en Efectivo</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2445,6 +2536,115 @@ export default function App() {
         </View>
       </Modal>
 
+      {/* Modal de Detalle Completo de la Orden */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={ordenSeleccionadaDetalle !== null}
+        onRequestClose={() => setOrdenSeleccionadaDetalle(null)}
+      >
+        <View style={styles.modalDetalleCentrado}>
+          <View style={[styles.modalDetalleContenido, { maxWidth: 550, maxHeight: '90%' }]}>
+            {ordenSeleccionadaDetalle && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                {/* Header */}
+                <View style={styles.modalDetalleHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Text style={[styles.nombreTexto, { color: '#38bdf8', fontSize: 20, fontWeight: '950' }]}>
+                      Orden #{ordenSeleccionadaDetalle.id}
+                    </Text>
+                    <View style={{ backgroundColor: '#10b98120', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#10b981' }}>
+                      <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '900' }}>
+                        {(ordenSeleccionadaDetalle.estado || 'Pendiente').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setOrdenSeleccionadaDetalle(null)} style={styles.botonModalCerrarIcono}>
+                    <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.subFormEtiqueta}>DATOS DEL CLIENTE</Text>
+                <View style={[styles.subFormularioTarjeta, { marginBottom: 16, backgroundColor: '#0f172a' }]}>
+                  <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '800' }}>
+                    👤 {ordenSeleccionadaDetalle.cliente_nombre || 'Cliente General'}
+                  </Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>
+                    ✉️ {ordenSeleccionadaDetalle.cliente_correo || 'Sin correo'} | 📞 {ordenSeleccionadaDetalle.cliente_telefono || 'N/A'}
+                  </Text>
+                  <Text style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                    📅 Fecha: {ordenSeleccionadaDetalle.fecha || 'N/A'}
+                  </Text>
+                </View>
+
+                {/* Desglose de Productos */}
+                <Text style={styles.subFormEtiqueta}>DESGLOSE DE PRODUCTOS</Text>
+                <View style={{ backgroundColor: '#0f172a', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1e293b', marginBottom: 16 }}>
+                  {(ordenSeleccionadaDetalle.descripcion || 'Sin ítems registrados')
+                    .split(', ')
+                    .filter(Boolean)
+                    .map((prodItem, idx) => (
+                      <View key={`item-det-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: idx < ordenSeleccionadaDetalle.descripcion.split(', ').length - 1 ? 1 : 0, borderBottomColor: '#1f2937' }}>
+                        <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: '#334155' }}>
+                          <Text style={{ fontSize: 16 }}>📦</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>
+                            {prodItem}
+                          </Text>
+                          <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+                            ✓ Componente Confirmado
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                </View>
+
+                {/* Totales Financieros */}
+                <View style={{ backgroundColor: '#0f172a', borderRadius: 12, padding: 16, borderWidth: 1.5, borderColor: '#38bdf8', marginBottom: 20 }}>
+                  {(() => {
+                    const totalMonto = Number(ordenSeleccionadaDetalle.total || 0);
+                    const subtotalNeto = totalMonto / 1.13;
+                    const ivaMonto = totalMonto - subtotalNeto;
+
+                    return (
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ color: '#94a3b8', fontSize: 13 }}>Subtotal Neto:</Text>
+                          <Text style={{ color: '#e2e8f0', fontSize: 14, fontWeight: '800' }}>₡{subtotalNeto.toFixed(2)}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ color: '#fbbf24', fontSize: 13, fontWeight: '800' }}>IVA Obligatorio (13%):</Text>
+                          <Text style={{ color: '#fbbf24', fontSize: 14, fontWeight: '800' }}>₡{ivaMonto.toFixed(2)}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1f2937' }}>
+                          <Text style={{ color: '#38bdf8', fontSize: 16, fontWeight: '900' }}>Total Orden:</Text>
+                          <Text style={{ color: '#10b981', fontSize: 22, fontWeight: '950' }}>₡{totalMonto.toFixed(2)}</Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.botonAccionPrincipal, { backgroundColor: '#4b5563', marginBottom: 10 }]}
+                  onPress={() => generarFacturaPDF(ordenSeleccionadaDetalle)}
+                >
+                  <Text style={styles.botonAccionPrincipalTexto}>📄 Generar Factura PDF</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.botonAccionPrincipal, { backgroundColor: '#374151' }]}
+                  onPress={() => setOrdenSeleccionadaDetalle(null)}
+                >
+                  <Text style={styles.botonAccionPrincipalTexto}>Cerrar Ventana</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal del Rastreador de Pedidos para Clientes */}
       <Modal
         animationType="fade"
@@ -3141,6 +3341,15 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* Pantalla Independiente de Pago Tilopay (WebView Sandbox) */}
+      <PantallaPagoTilopay
+        visible={mostrarTilopayModal}
+        paymentData={datosPagoTilopay}
+        onSuccess={manejarExitoTilopay}
+        onCancel={manejarCancelarTilopay}
+        onError={manejarErrorTilopay}
+      />
 
     </SafeAreaView>
   );

@@ -310,7 +310,7 @@ registerRoutes('/ventas/:id', 'get', (req, res) => {
       c.nombre_completo AS cliente_nombre,
       c.correo AS cliente_correo,
       c.telefono AS cliente_telefono,
-      GROUP_CONCAT(CONCAT(d.cantidad, 'x ', p.nombre) SEPARATOR ', ') AS descripcion
+      GROUP_CONCAT(CONCAT(d.cantidad, 'x ', COALESCE(p.nombre, 'Servicio de Ensamble de PC')) SEPARATOR ', ') AS descripcion
     FROM ventas v 
     LEFT JOIN detalle_venta d ON v.id = d.ventas_id 
     LEFT JOIN productos p ON d.productos_id = p.id
@@ -446,6 +446,26 @@ registerRoutes('/ventas/:id/estado', 'put', (req, res) => {
       });
     });
   });
+});
+
+// Endpoints de retorno y webhook para la pasarela Tilopay (Sandbox)
+registerRoutes('/tilopay/redirect', 'get', (req, res) => {
+  const { code, result, orderNumber, authCode } = req.query;
+  res.send(`
+    <html>
+      <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #fff;">
+        <h2>Tilopay Sandbox Response</h2>
+        <p>Estado: <strong>${result || 'Completado'}</strong> (Código: ${code})</p>
+        <p>Orden #: <strong>${orderNumber}</strong></p>
+        <p>Autorización: <strong>${authCode || 'N/A'}</strong></p>
+      </body>
+    </html>
+  `);
+});
+
+registerRoutes('/tilopay/webhook', 'post', (req, res) => {
+  console.log('💳 Webhook recibido de Tilopay:', req.body);
+  res.json({ success: true, message: 'Webhook de Tilopay recibido correctamente' });
 });
 
 // Endpoints auxiliares para documentación y estado de salud
