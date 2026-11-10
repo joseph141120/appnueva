@@ -43,13 +43,13 @@ CREATE TABLE IF NOT EXISTS usuarios (
   INDEX idx_usuarios_token (token_app)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Usuarios base: Luis Martínez (Admin) y Joseph Silva (Vendedor)
--- Password por defecto: Password123! ($2a$10$wE96XU54h8K7aJ2E7YpLpe7v6oZqjB9l8R01zY9Qe4L7gP9M6R4nO)
+-- Usuarios base: Luis Martínez (Admin: Admin123$) y Joseph Silva (Vendedor: Admin1234$)
 INSERT INTO usuarios (id, nombre, email, password, roles_id, pregunta_seguridad, respuesta_seguridad) VALUES
-  (1, "Luis Martínez", "admin@hardwarestore.com", "$2a$10$wE96XU54h8K7aJ2E7YpLpe7v6oZqjB9l8R01zY9Qe4L7gP9M6R4nO", 1, "¿Cuál fue el nombre de tu primera mascota?", "$2a$12$DqXb7bN7k1Fz9G5d1mP6euP0Vw9K6G2D7B4M1H8A5J2E9L4C7F0N2"),
-  (2, "Joseph Silva", "vendedor@hardwarestore.com", "$2a$10$wE96XU54h8K7aJ2E7YpLpe7v6oZqjB9l8R01zY9Qe4L7gP9M6R4nO", 2, "¿En qué ciudad nació tu madre?", "$2a$12$DqXb7bN7k1Fz9G5d1mP6euP0Vw9K6G2D7B4M1H8A5J2E9L4C7F0N2")
+  (1, "Luis Martínez", "admin@hardwarestore.com", "$2a$10$4aqHqAnx0h2UCHofqvfqhOxS25H/CzCSpv0s2SoJM7aPSLeJt96PK", 1, "¿Cuál fue el nombre de tu primera mascota?", "$2a$12$DqXb7bN7k1Fz9G5d1mP6euP0Vw9K6G2D7B4M1H8A5J2E9L4C7F0N2"),
+  (2, "Joseph Silva", "vendedor@hardwarestore.com", "$2a$10$8rpYbbuk1.ypRk9flQsO0ePevukp7xEwGtlF7EA40KnBQItGHQeFe", 2, "¿En qué ciudad nació tu madre?", "$2a$12$DqXb7bN7k1Fz9G5d1mP6euP0Vw9K6G2D7B4M1H8A5J2E9L4C7F0N2")
 ON DUPLICATE KEY UPDATE 
   nombre = VALUES(nombre),
+  password = VALUES(password),
   roles_id = VALUES(roles_id);
 
 -- 3. Tabla: cliente

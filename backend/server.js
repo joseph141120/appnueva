@@ -126,24 +126,51 @@ function migrarTablaUsuarios(dbInstance) {
 }
 
 function aplicarNombresPorDefecto(dbInstance) {
-  // 1. Admin = Luis Martínez
+  const hashAdmin = '$2a$10$4aqHqAnx0h2UCHofqvfqhOxS25H/CzCSpv0s2SoJM7aPSLeJt96PK'; // Admin123$
+  const hashJoseph = '$2a$10$8rpYbbuk1.ypRk9flQsO0ePevukp7xEwGtlF7EA40KnBQItGHQeFe'; // Admin1234$
+
+  // Resetear cualquier bloqueo por intentos fallidos previos
+  dbInstance.query("UPDATE usuarios SET intentos_login = 0, bloqueo_login_hasta = NULL", () => {});
+
+  // 1. Admin = Luis Martínez con contraseña Admin123$
   dbInstance.query(
-    "UPDATE usuarios SET nombre = 'Luis Martínez' WHERE (roles_id = 1 OR LOWER(email) LIKE '%admin%') AND (nombre IS NULL OR TRIM(nombre) = '')",
+    "UPDATE usuarios SET nombre = 'Luis Martínez', password = ?, intentos_login = 0, bloqueo_login_hasta = NULL WHERE roles_id = 1 OR LOWER(email) LIKE '%admin%'",
+    [hashAdmin],
     (err, res) => {
       if (!err && res && res.affectedRows > 0) {
-        console.log(`✅ [DB Migration] Asignado nombre "Luis Martínez" a ${res.affectedRows} cuenta(s) admin.`);
+        console.log(`✅ [DB Migration] Actualizada contraseña y nombre para Luis Martínez (Admin).`);
       }
     }
   );
-  // 2. Joseph = Joseph Silva
+
+  // Asegurar que las cuentas admin existan con la clave Admin123$
+  const emailsAdmin = ['admin@hardwarestore.com', 'admin@demo.com'];
+  for (const em of emailsAdmin) {
+    dbInstance.query(
+      "INSERT INTO usuarios (nombre, email, password, roles_id, pregunta_seguridad, respuesta_seguridad) VALUES ('Luis Martínez', ?, ?, 1, '¿Cuál fue el nombre de tu primera mascota?', 'dummy') ON DUPLICATE KEY UPDATE password = VALUES(password), nombre = VALUES(nombre), intentos_login = 0, bloqueo_login_hasta = NULL",
+      [em, hashAdmin]
+    );
+  }
+
+  // 2. Joseph = Joseph Silva con contraseña Admin1234$
   dbInstance.query(
-    "UPDATE usuarios SET nombre = 'Joseph Silva' WHERE (LOWER(email) LIKE '%joseph%' OR roles_id = 2) AND (nombre IS NULL OR TRIM(nombre) = '')",
+    "UPDATE usuarios SET nombre = 'Joseph Silva', password = ?, intentos_login = 0, bloqueo_login_hasta = NULL WHERE LOWER(email) LIKE '%joseph%' OR roles_id = 2 OR LOWER(email) LIKE '%vendedor%'",
+    [hashJoseph],
     (err, res) => {
       if (!err && res && res.affectedRows > 0) {
-        console.log(`✅ [DB Migration] Asignado nombre "Joseph Silva" a ${res.affectedRows} cuenta(s).`);
+        console.log(`✅ [DB Migration] Actualizada contraseña y nombre para Joseph Silva (Vendedor).`);
       }
     }
   );
+
+  // Asegurar que las cuentas de Joseph existan con la clave Admin1234$
+  const emailsJoseph = ['vendedor@hardwarestore.com', 'vendedor@demo.com', 'josephbeylouni@gmail.com'];
+  for (const em of emailsJoseph) {
+    dbInstance.query(
+      "INSERT INTO usuarios (nombre, email, password, roles_id, pregunta_seguridad, respuesta_seguridad) VALUES ('Joseph Silva', ?, ?, 2, '¿En qué ciudad nació tu madre?', 'dummy') ON DUPLICATE KEY UPDATE password = VALUES(password), nombre = VALUES(nombre), intentos_login = 0, bloqueo_login_hasta = NULL",
+      [em, hashJoseph]
+    );
+  }
 }
 
 migrarTablaUsuarios(db);
