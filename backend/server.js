@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
@@ -28,17 +29,61 @@ app.use(cors());
 // Mitigación DoS por tamaño excesivo de payload
 app.use(express.json({ limit: '100kb' }));
 
-// Configuración del pool de la base de datos MariaDB / MySQL (XAMPP sin contraseña por defecto)
-const db = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD ?? '',
-  database: process.env.DB_NAME || 'mydb',
-  port: parseInt(process.env.DB_PORT || '3306', 10)
-});
+// Configuración del pool de la base de datos MariaDB / MySQL (soporte Railway MYSQL_URL / MYSQL_PRIVATE_URL)
+const connectionConfig = (process.env.MYSQL_URL || process.env.MYSQL_PRIVATE_URL || process.env.DATABASE_URL)
+  ? {
+      uri: process.env.MYSQL_URL || process.env.MYSQL_PRIVATE_URL || process.env.DATABASE_URL,
+      multipleStatements: true,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    }
+  : {
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD ?? '',
+      database: process.env.DB_NAME || 'mydb',
+      port: parseInt(process.env.DB_PORT || '3306', 10),
+      multipleStatements: true,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    };
+
+const db = mysql.createPool(connectionConfig);
 
 // Inicializar tabla para almacenar tokens de notificación push
 notificaciones.inicializarTabla(db);
+
+// Auto-inicializa el esquema y catálogo si la base de datos en la nube es nueva o está vacía
+function autoInicializarBaseDatos(dbInstance) {
+  if (!dbInstance) return;
+  dbInstance.query("SHOW TABLES LIKE 'productos'", (err, rows) => {
+    if (err) {
+      console.warn('⚠️ No se pudo comprobar tabla productos:', err.message);
+      return;
+    }
+    if (!rows || rows.length === 0) {
+      console.log('🔄 [Auto-Init] Base de datos vacía detectada. Inicializando esquema y catálogo...');
+      const schemaPath = path.join(__dirname, 'database_schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        const sql = fs.readFileSync(schemaPath, 'utf8');
+        dbInstance.query(sql, (execErr) => {
+          if (execErr) {
+            console.error('❌ Error al auto-inicializar base de datos:', execErr.message);
+          } else {
+            console.log('🎉 ¡Base de datos, catálogo de 43 productos y usuarios inicializados con éxito!');
+            aplicarNombresPorDefecto(dbInstance);
+          }
+        });
+      }
+    } else {
+      console.log('✅ Base de datos verificada con productos existentes.');
+    }
+  });
+}
+
+autoInicializarBaseDatos(db);
 
 // Resuelve el nombre del usuario protegiendo la privacidad (evita exponer correos en notificaciones y UI)
 function resolverNombreUsuario(usuario) {
