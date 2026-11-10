@@ -16,7 +16,7 @@ export const tilopayService = {
       cliente_correo,
       correo,
       clienteTelefono = '88888888',
-      descripcion = 'Compra en PC Builder Express',
+      descripcion = 'Compra en JLK Solutions Security',
       items = []
     } = paymentData;
 
@@ -70,7 +70,7 @@ export const tilopayService = {
 
     if (productosTilopay.length === 0) {
       productosTilopay.push({
-        title: descripcion || 'Compra en PC Builder Express',
+        title: descripcion || 'Compra en JLK Solutions Security',
         price: montoNum,
         quantity: 1,
         description: descripcion || 'Compra de componentes de PC',

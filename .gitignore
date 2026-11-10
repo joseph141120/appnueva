@@ -33,6 +33,7 @@ yarn-error.*
 # local env files
 .env
 .env*.local
+*firebase-service-account*.json
 
 # typescript
 *.tsbuildinfo
@@ -40,3 +41,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# temporary artifacts and screenshots
+*.xml
+emulator_screen*.png
+screenshot_test.png
+test_screen.png
+backup_tema/

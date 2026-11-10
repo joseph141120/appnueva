@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "898093154402",
+    "project_id": "jlk-solutions-security",
+    "storage_bucket": "jlk-solutions-security.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898093154402:android:1b628955b5cffe2ebd513b",
+        "android_client_info": {
+          "package_name": "com.jlksecurity.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7GVDGT0LfO-KIqlH6Bexw1x2W4mj-joE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

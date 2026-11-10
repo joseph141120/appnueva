@@ -132,7 +132,7 @@ export default function TilopayPaymentScreen({
         {/* Indicador de Carga */}
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#38bdf8" />
+            <ActivityIndicator size="large" color="#6cc04a" />
             <Text style={styles.textoCargando}>Cargando pasarela Tilopay...</Text>
           </View>
         )}
@@ -167,7 +167,7 @@ export default function TilopayPaymentScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a'
+    backgroundColor: '#ffffff'
   },
   header: {
     flexDirection: 'row',
@@ -175,9 +175,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eef7ea',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155'
+    borderBottomColor: '#cfe3c6'
   },
   botonCerrar: {
     paddingVertical: 6,
@@ -196,24 +196,24 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   tituloHeader: {
-    color: '#38bdf8',
+    color: '#6cc04a',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.5
   },
   subtituloHeader: {
-    color: '#94a3b8',
+    color: '#5b6b62',
     fontSize: 11,
     fontWeight: '600'
   },
   badgeSandbox: {
-    backgroundColor: '#0284c7',
+    backgroundColor: '#f97316',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6
   },
   textoBadge: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontSize: 10,
     fontWeight: '900'
   },
@@ -228,23 +228,23 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   textoCargando: {
-    color: '#94a3b8',
+    color: '#5b6b62',
     marginTop: 10,
     fontSize: 13,
     fontWeight: '600'
   },
   webViewContainer: {
     flex: 1,
-    backgroundColor: '#0f172a'
+    backgroundColor: '#ffffff'
   },
   webView: {
     flex: 1,
-    backgroundColor: '#0f172a'
+    backgroundColor: '#ffffff'
   },
   webIframe: {
     width: '100%',
     height: '100%',
     border: 'none',
-    backgroundColor: '#0f172a'
+    backgroundColor: '#ffffff'
   }
 });

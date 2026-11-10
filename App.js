@@ -7,134 +7,134 @@
 // =========================================================================================
 
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Alert, SafeAreaView, ActivityIndicator, TextInput, ScrollView, Platform, StatusBar, Image, Modal } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Alert, SafeAreaView, ActivityIndicator, TextInput, ScrollView, Platform, StatusBar, Image, Modal, useWindowDimensions, LogBox } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-// Mapeo de imágenes locales de assets para el catálogo
+// Silenciar avisos informativos de Expo Go sobre notificaciones remotas en desarrollo
+LogBox.ignoreLogs([
+  'Android Push notifications (remote notifications)',
+  'expo-notifications was removed from Expo Go',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+  'expo-notifications: Android Push notifications',
+]);
+
+const _originalConsoleError = console.error;
+console.error = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('Android Push notifications') || args[0].includes('removed from Expo Go'))
+  ) {
+    return; // Silenciar el aviso interno de Expo Go
+  }
+  _originalConsoleError(...args);
+};
+
+// Mapeo opcional de imágenes personalizadas por ID de producto
 const IMAGENES_PRODUCTOS = {
-  1: require('./assets/amd_ryzen.png'),
-  2: require('./assets/rtx_4090.png'),
-  3: require('./assets/corsair_ram.png'),
-  4: require('./assets/pc_gamer.png'),
-  5: require('./assets/razer_keyboard.png'),
-  6: require('./assets/logitech_headset.png'),
+  // Las imágenes se cargan dinámicamente desde la BD o usan el icono de JLK Solutions Security
   7: require('./assets/logitech_streamcam.png'),
-  8: require('./assets/amd_ryzen.png'),
 };
 
 const IMAGEN_DEFAULT = require('./assets/icon.png');
 
 // Importación del servicio centralizado de la API y manejador de token en memoria
 import { apiService, setAuthToken } from './src/services/api';
+import { PREGUNTAS_SEGURIDAD, REGLAS_PASSWORD, validarPasswordSegura } from './src/constants/seguridad';
+import { API_CONFIG } from './src/constants/Api';
 import PantallaPagoTilopay from './src/screens/PantallaPagoTilopay';
+import notificationService from './src/services/notificationService';
 
 // Configuración de la URL de red propia
-const API_URL = 'http://localhost:3000';
+const API_URL = API_CONFIG.BASE_URL;
 
-// Función para enviar notificaciones de escritorio en navegadores web (PC)
-const enviarNotificacionWeb = (titulo, cuerpo) => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window) {
-    if (Notification.permission === 'granted') {
-      new Notification(titulo, { body: cuerpo });
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          new Notification(titulo, { body: cuerpo });
-        }
-      });
-    }
-  }
+// Función global para emitir notificaciones push nativas y en pantalla ante CUALQUIER movimiento
+const enviarNotificacionMovimiento = (titulo, cuerpo, tipo = 'general', meta = {}) => {
+  notificationService.notificarMovimiento(titulo, cuerpo, tipo, meta);
 };
 
-// Categorías completas para catálogo e-commerce y armador de PC
+// Mantiene compatibilidad total con llamadas históricas
+const enviarNotificacionWeb = (titulo, cuerpo) => {
+  enviarNotificacionMovimiento(titulo, cuerpo, 'general');
+};
+
+// Categorías completas para catálogo de seguridad electrónica y automatización
 const CATEGORIAS = [
   'Todas',
-  'Procesadores',
-  'Tarjetas Madre',
-  'Memorias RAM',
-  'Tarjetas de Video',
-  'Almacenamiento',
-  'Fuentes de Poder',
-  'Gabinetes / Cases',
-  'Enfriamiento Líquido',
-  'Ventiladores / Fans',
-  'Periféricos',
-  'PCs Completas',
-  'Accesorios',
-  'Audífonos'
+  'Cámaras de Seguridad',
+  'Grabadores DVR y NVR',
+  'Cercos Eléctricos',
+  'Motores para Portones',
+  'Controles y Mandos',
+  'Alarmas y Sensores',
+  'Accesorios y Conectividad'
 ];
 
-// Catálogo offline extendido con al menos 3 productos por cada categoría para pruebas
+// Catálogo offline extendido para el negocio de Seguridad Electrónica
 const productosMockDef = [
-  // 1. Procesadores
-  { id: 1, nombre: 'AMD Ryzen 7 7800X3D 4.2GHz', precio_base: 245000.00, precio: 245000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Procesadores', descripcion: 'Procesador gaming tope de gama con 3D V-Cache.' },
-  { id: 2, nombre: 'Intel Core i7-14700K 5.6GHz', precio_base: 265000.00, precio: 265000.00, descuento_porcentaje: 0, stock: 6, categoria_nombre: 'Procesadores', descripcion: 'Procesador de 20 núcleos para gaming y renderizado.' },
-  { id: 3, nombre: 'AMD Ryzen 5 7600X 4.7GHz', precio_base: 145000.00, precio: 145000.00, descuento_porcentaje: 0, stock: 12, categoria_nombre: 'Procesadores', descripcion: 'Procesador Socket AM5 eficiente de gran rendimiento.' },
+  // 1. Cámaras de Seguridad
+  { id: 1, nombre: 'Cámara Domo HD 1080p Visión Nocturna Infrarroja', precio_base: 18500.00, precio: 18500.00, descuento_porcentaje: 0, stock: 35, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1yorcQl3X0P-4Mq-pixMsV_zzulAz6n8Z', descripcion: 'Cámara domo para interiores con lente de 2.8mm, ángulo amplio de 103° y visión nocturna IR hasta 20 metros.' },
+  { id: 2, nombre: 'Cámara Bullet IP 4K Exterior Metálica IP67', precio_base: 48000.00, precio: 43200.00, descuento_porcentaje: 10, stock: 18, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1x3jV1nVAdxi92Vao4x6IewIymHKRqdHG', descripcion: 'Cámara bullet impermeable con resolución 4K Ultra HD, sensor de movimiento inteligente y visión nocturna de 30m.' },
+  { id: 3, nombre: 'Cámara PTZ WiFi Robótica 360° Seguimiento Inteligente', precio_base: 35000.00, precio: 35000.00, descuento_porcentaje: 0, stock: 22, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1U9c7JlzVVmes_Pz_9vxkGLjzEeR_7P72', descripcion: 'Cámara de seguimiento automático con giro 355° horizontal y 90° vertical, audio bidireccional y alertas al celular.' },
+  { id: 4, nombre: 'Cámara Domo IP PoE 5MP con Micrófono Integrado', precio_base: 38000.00, precio: 38000.00, descuento_porcentaje: 0, stock: 14, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1yorcQl3X0P-4Mq-pixMsV_zzulAz6n8Z', descripcion: 'Cámara PoE de alta definición para techo, carcasa antivandálica IK10 y captura de audio ambiental en tiempo real.' },
+  { id: 5, nombre: 'Cámara de Seguridad Solar WiFi 4G Exterior', precio_base: 80000.00, precio: 68000.00, descuento_porcentaje: 15, stock: 10, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1yorcQl3X0P-4Mq-pixMsV_zzulAz6n8Z', descripcion: 'Cámara autónoma con panel solar integrado y batería de litio recargable. No requiere cables de corriente.' },
+  { id: 6, nombre: 'Cámara Tipo Domo Varifocal Motorizada 2.8-12mm', precio_base: 60000.00, precio: 60000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Cámaras de Seguridad', imagen: 'https://lh3.googleusercontent.com/d/1yorcQl3X0P-4Mq-pixMsV_zzulAz6n8Z', descripcion: 'Zoom óptico motorizado 4X para enfocar rostros o placas vehiculares a distancia con nitidez superior.' },
 
-  // 2. Tarjetas Madre
-  { id: 4, nombre: 'ASUS ROG Strix B650-A Gaming WiFi', precio_base: 145000.00, precio: 145000.00, descuento_porcentaje: 0, stock: 7, categoria_nombre: 'Tarjetas Madre', descripcion: 'Tarjeta madre Socket AM5 con soporte DDR5 y WiFi 6E.' },
-  { id: 5, nombre: 'MSI MAG Z790 Tomahawk WiFi', precio_base: 175000.00, precio: 175000.00, descuento_porcentaje: 0, stock: 5, categoria_nombre: 'Tarjetas Madre', descripcion: 'Tarjeta madre LGA 1700 robusta para procesadores Intel.' },
-  { id: 6, nombre: 'Gigabyte B650M DS3H Micro-ATX', precio_base: 85000.00, precio: 85000.00, descuento_porcentaje: 0, stock: 10, categoria_nombre: 'Tarjetas Madre', descripcion: 'Placa base compacta y económica para ensambles AM5.' },
+  // 2. Grabadores DVR y NVR
+  { id: 7, nombre: 'Grabador DVR 4 Canales 1080p Lite H.265+', precio_base: 39000.00, precio: 39000.00, descuento_porcentaje: 0, stock: 12, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/11mVsqaGr0AXUpsWmPuJ6zdLN8ZSvt9I6', descripcion: 'DVR pentahíbrido de 4 canales para cámaras analógicas y HD. Compresión H.265+ para ahorrar espacio en disco.' },
+  { id: 8, nombre: 'Grabador DVR 8 Canales 5MP con Reconocimiento Facial', precio_base: 57000.00, precio: 57000.00, descuento_porcentaje: 0, stock: 15, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/11mVsqaGr0AXUpsWmPuJ6zdLN8ZSvt9I6', descripcion: 'DVR de 8 canales con inteligencia artificial, detección de vehículos/humanos y salida HDMI/VGA.' },
+  { id: 9, nombre: 'Grabador NVR 16 Canales PoE 4K Ultra HD', precio_base: 140000.00, precio: 133000.00, descuento_porcentaje: 5, stock: 6, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/11mVsqaGr0AXUpsWmPuJ6zdLN8ZSvt9I6', descripcion: 'NVR profesional de 16 puertos PoE integrados para conectar cámaras IP directamente sin fuentes externas.' },
+  { id: 10, nombre: 'Disco Duro 1TB Western Digital Purple CCTV 24/7', precio_base: 45000.00, precio: 45000.00, descuento_porcentaje: 0, stock: 20, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/1vZXhXNGBPBWDqATm_dnG86c3_DaEA_GW', descripcion: 'Disco duro grado vigilancia optimizado para grabación continua sin interrupciones ni pérdida de cuadros.' },
+  { id: 11, nombre: 'Disco Duro 2TB Western Digital Purple CCTV 24/7', precio_base: 63000.00, precio: 63000.00, descuento_porcentaje: 0, stock: 16, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/1vZXhXNGBPBWDqATm_dnG86c3_DaEA_GW', descripcion: 'Capacidad de 2 Terabytes para almacenar hasta 30 días de grabación continua en alta definición.' },
+  { id: 12, nombre: 'Disco Duro 4TB Seagate SkyHawk Surveillance', precio_base: 90000.00, precio: 90000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Grabadores DVR y NVR', imagen: 'https://lh3.googleusercontent.com/d/1vZXhXNGBPBWDqATm_dnG86c3_DaEA_GW', descripcion: 'Almacenamiento masivo para DVRs y NVRs empresariales de alta exigencia.' },
 
-  // 3. Memorias RAM
-  { id: 7, nombre: 'Corsair Vengeance DDR5 32GB (2x16GB) 6000MHz', precio_base: 85000.00, precio: 85000.00, descuento_porcentaje: 0, stock: 15, categoria_nombre: 'Memorias RAM', descripcion: 'Memoria RAM ultra veloz de 6000MHz Optimizada EXPO/XMP.' },
-  { id: 8, nombre: 'Kingston FURY Beast 16GB DDR5 5600MHz', precio_base: 42000.00, precio: 42000.00, descuento_porcentaje: 0, stock: 20, categoria_nombre: 'Memorias RAM', descripcion: 'Memoria RAM de alto rendimiento para gaming.' },
-  { id: 9, nombre: 'G.Skill Trident Z5 RGB 32GB (2x16GB) DDR5', precio_base: 98000.00, precio: 98000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Memorias RAM', descripcion: 'Memorias con iluminación RGB radiante a 6400MHz.' },
+  // 3. Cercos Eléctricos
+  { id: 13, nombre: 'Energizador de Cerco Eléctrico 10.000V con Batería', precio_base: 95000.00, precio: 95000.00, descuento_porcentaje: 0, stock: 14, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/1N9tiACwaNF-y7kALIrKcTjsVUtk20w3E', descripcion: 'Equipo central para cerco perimetral con descarga disuasiva no letal de 10.000 voltios y alarma sonora.' },
+  { id: 14, nombre: 'Energizador Inteligente WiFi 15.000V Control por App', precio_base: 130000.00, precio: 123500.00, descuento_porcentaje: 5, stock: 9, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/1N9tiACwaNF-y7kALIrKcTjsVUtk20w3E', descripcion: 'Energizador con conexión WiFi para activar/desactivar y recibir notificaciones de corte de línea en el celular.' },
+  { id: 15, nombre: 'Kit 25 Aisladores Tubulares Templadores para Cerco', precio_base: 14000.00, precio: 14000.00, descuento_porcentaje: 0, stock: 40, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/15CcVzG1YpOJW1LFZYJq-2xy5PRu2AXmi', descripcion: 'Aisladores reforzados con protección UV contra rayos solares e intemperie para postes esquineros.' },
+  { id: 16, nombre: 'Bobina de Alambre de Aluminio Especial para Cerco 500m', precio_base: 33000.00, precio: 33000.00, descuento_porcentaje: 0, stock: 25, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/1N9tiACwaNF-y7kALIrKcTjsVUtk20w3E', descripcion: 'Alambre de aleación de aluminio de alta conductividad eléctrica y libre de óxido para perímetro seguro.' },
+  { id: 17, nombre: 'Sirena de Alta Potencia 30W Doble Tono para Cerco', precio_base: 12500.00, precio: 12500.00, descuento_porcentaje: 0, stock: 30, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/1ptlQSC9Ai-MOkoMvp50sE-3gxmNNDqxC', descripcion: 'Sirena acústica de 120 decibeles con sonido penetrante para disuasión perimetral inmediata.' },
+  { id: 18, nombre: 'Letrero de Advertencia Reglamentario Peligro Cerco Eléctrico', precio_base: 3000.00, precio: 3000.00, descuento_porcentaje: 0, stock: 60, categoria_nombre: 'Cercos Eléctricos', imagen: 'https://lh3.googleusercontent.com/d/1N9tiACwaNF-y7kALIrKcTjsVUtk20w3E', descripcion: 'Placa plástica de alta visibilidad con texto normativo obligatorio para cercos electrificados.' },
 
-  // 4. Tarjetas de Video
-  { id: 10, nombre: 'NVIDIA GeForce RTX 4090 24GB', precio_base: 1150000.00, precio: 1035000.00, descuento_porcentaje: 10, stock: 4, categoria_nombre: 'Tarjetas de Video', descripcion: 'La tarjeta gráfica de consumo más potente del mundo.' },
-  { id: 11, nombre: 'NVIDIA GeForce RTX 4070 Super 12GB', precio_base: 445000.00, precio: 445000.00, descuento_porcentaje: 0, stock: 9, categoria_nombre: 'Tarjetas de Video', descripcion: 'Rendimiento supremo para juegos a 1440p en ultra.' },
-  { id: 12, nombre: 'AMD Radeon RX 7800 XT 16GB', precio_base: 385000.00, precio: 385000.00, descuento_porcentaje: 0, stock: 6, categoria_nombre: 'Tarjetas de Video', descripcion: 'Tarjeta gráfica potente de 16GB VRAM de AMD.' },
+  // 4. Motores para Portones
+  { id: 19, nombre: 'Motor Corredizo Rápido 800kg para Portón Eléctrico', precio_base: 210000.00, precio: 189000.00, descuento_porcentaje: 10, stock: 10, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Kit de motor para portón corredizo de hasta 800 kilos de peso. Apertura rápida y silenciosa.' },
+  { id: 20, nombre: 'Motor Corredizo Industrial 1500kg Alto Tráfico', precio_base: 335000.00, precio: 335000.00, descuento_porcentaje: 0, stock: 5, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Motor de uso rudo para portones pesados de condominios o bodegas con engranajes de bronce bañados en aceite.' },
+  { id: 21, nombre: 'Kit Motor Batiente de 2 Brazos Hidráulicos 3m por Hoja', precio_base: 390000.00, precio: 390000.00, descuento_porcentaje: 0, stock: 4, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Sistema completo para portones de 2 hojas abatibles con desaceleración suave y llaves de desbloqueo manual.' },
+  { id: 22, nombre: 'Tramo de Cremallera de Acero Galvanizado M4 (1 Metro)', precio_base: 10500.00, precio: 10500.00, descuento_porcentaje: 0, stock: 50, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Barra dentada de acero zincado de 1 metro con espaciadores para fijar en portones corredizos.' },
+  { id: 23, nombre: 'Sensor de Fotocelda Anti-Aplastamiento para Portón', precio_base: 20000.00, precio: 20000.00, descuento_porcentaje: 0, stock: 24, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Par de sensores infrarrojos de seguridad que detienen e invierten el portón si detectan autos o personas.' },
+  { id: 24, nombre: 'Luz Estroboscópica Destellante de Seguridad 12V/24V', precio_base: 14000.00, precio: 14000.00, descuento_porcentaje: 0, stock: 20, categoria_nombre: 'Motores para Portones', imagen: 'https://lh3.googleusercontent.com/d/1EMqu4LEhHhgd_lR9YYc0LNjuyKeqvOYr', descripcion: 'Lámpara indicadora de movimiento para advertir la apertura o cierre del portón eléctrico a peatones.' },
 
-  // 5. Almacenamiento
-  { id: 13, nombre: 'SSD NVMe Samsung 990 PRO 2TB PCIe 4.0', precio_base: 115000.00, precio: 115000.00, descuento_porcentaje: 0, stock: 12, categoria_nombre: 'Almacenamiento', descripcion: 'SSD ultra rápido de 7450 MB/s de lectura.' },
-  { id: 14, nombre: 'SSD NVMe Kingston NV2 1TB M.2', precio_base: 48000.00, precio: 48000.00, descuento_porcentaje: 0, stock: 18, categoria_nombre: 'Almacenamiento', descripcion: 'Almacenamiento veloz M.2 PCIe 4.0 para juegos y SO.' },
-  { id: 15, nombre: 'SSD WD Black SN850X 1TB NVMe Gaming', precio_base: 65000.00, precio: 65000.00, descuento_porcentaje: 0, stock: 14, categoria_nombre: 'Almacenamiento', descripcion: 'Unidad de estado sólido optimizada para carga de juegos rápida.' },
+  // 5. Controles y Mandos de Portón
+  { id: 25, nombre: 'Control Remoto 4 Botones 433MHz para Portón Eléctrico', precio_base: 9000.00, precio: 9000.00, descuento_porcentaje: 0, stock: 80, categoria_nombre: 'Controles y Mandos', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Control transmisor de largo alcance con 4 canales para operar hasta 4 portones o luces distintas.' },
+  { id: 26, nombre: 'Control Metálico Llavero Clonador Universal Multicódigo', precio_base: 11000.00, precio: 11000.00, descuento_porcentaje: 0, stock: 50, categoria_nombre: 'Controles y Mandos', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Control portátil reforzado en aluminio con capacidad de clonar códigos fijos y variables comunes.' },
+  { id: 27, nombre: 'Módulo Receptor Inalámbrico Universal 2 Canales', precio_base: 22500.00, precio: 22500.00, descuento_porcentaje: 0, stock: 25, categoria_nombre: 'Controles y Mandos', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Receptor de radiofrecuencia para adaptar controles modernos a cualquier marca de motor de portón.' },
+  { id: 28, nombre: 'Pulsador Inalámbrico de Pared para Portón Eléctrico', precio_base: 15000.00, precio: 15000.00, descuento_porcentaje: 0, stock: 20, categoria_nombre: 'Controles y Mandos', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Botonera de pared sin cables para abrir o cerrar el portón desde el interior de la casa u oficina.' },
+  { id: 29, nombre: 'Receptor WiFi Inteligente para Portón (Apertura por Celular)', precio_base: 26000.00, precio: 26000.00, descuento_porcentaje: 0, stock: 15, categoria_nombre: 'Controles y Mandos', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Módulo inteligente compatible con Tuya/SmartLife para abrir el portón desde cualquier parte del mundo.' },
 
-  // 6. Fuentes de Poder
-  { id: 16, nombre: 'Corsair RM850x 850W 80 Plus Gold Modular', precio_base: 95000.00, precio: 95000.00, descuento_porcentaje: 0, stock: 10, categoria_nombre: 'Fuentes de Poder', descripcion: 'Fuente de poder 100% modular con certificación Gold.' },
-  { id: 17, nombre: 'EVGA 700W 80 Plus Bronze', precio_base: 45000.00, precio: 45000.00, descuento_porcentaje: 0, stock: 14, categoria_nombre: 'Fuentes de Poder', descripcion: 'Fuente de energía confiable para ensambles estándar.' },
-  { id: 18, nombre: 'ASUS ROG Thor 1000W Platinum II Modular', precio_base: 185000.00, precio: 185000.00, descuento_porcentaje: 0, stock: 4, categoria_nombre: 'Fuentes de Poder', descripcion: 'Fuente de nivel entusiasta con pantalla OLED de consumo.' },
+  // 6. Alarmas y Sensores
+  { id: 30, nombre: 'Panel de Alarma Inteligente WiFi / GSM con Sirena', precio_base: 86000.00, precio: 77400.00, descuento_porcentaje: 10, stock: 10, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1ptlQSC9Ai-MOkoMvp50sE-3gxmNNDqxC', descripcion: 'Central de alarma híbrida inalámbrica con llamada automática por SIM celular y notificaciones por aplicación.' },
+  { id: 31, nombre: 'Sensor de Movimiento PIR Inalámbrico Antimascotas', precio_base: 16000.00, precio: 16000.00, descuento_porcentaje: 0, stock: 35, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1geGeOsmENSdjVV4-OO4GeclD80vswl7p', descripcion: 'Detector de presencia infrarrojo pasivo que ignora mascotas de hasta 20kg para evitar falsas alarmas.' },
+  { id: 32, nombre: 'Sensor Magnético Inalámbrico para Puertas y Ventanas', precio_base: 10000.00, precio: 10000.00, descuento_porcentaje: 0, stock: 50, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1nFpzo-NgwHcrSNqw1lNb0kA1W35WRyvc', descripcion: 'Contacto magnético compacto con batería de larga duración para alertar aperturas no autorizadas.' },
+  { id: 33, nombre: 'Botón de Pánico Inalámbrico SOS para Emergencias', precio_base: 7500.00, precio: 7500.00, descuento_porcentaje: 0, stock: 25, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1AfZClVA-rSIEMkMiTL9-mb3946iyFdea', descripcion: 'Pulsador de auxilio para adultos mayores o cajas de cobro que dispara la alarma silenciosa al instante.' },
+  { id: 34, nombre: 'Sensor de Humo Fotoeléctrico Inalámbrico Autónomo', precio_base: 18000.00, precio: 18000.00, descuento_porcentaje: 0, stock: 20, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1nFpzo-NgwHcrSNqw1lNb0kA1W35WRyvc', descripcion: 'Detector de humo con alarma acústica incorporada de 85dB y enlace al sistema de seguridad central.' },
+  { id: 35, nombre: 'Teclado Táctil Inalámbrico con Lector de Tarjetas RFID', precio_base: 29000.00, precio: 29000.00, descuento_porcentaje: 0, stock: 12, categoria_nombre: 'Alarmas y Sensores', imagen: 'https://lh3.googleusercontent.com/d/1nFpzo-NgwHcrSNqw1lNb0kA1W35WRyvc', descripcion: 'Teclado de acceso para armar y desarmar el sistema de alarma mediante clave numérica o llavero de proximidad.' },
 
-  // 7. Gabinetes / Cases
-  { id: 19, nombre: 'Gabinete NZXT H9 Flow RGB Cristal Templado', precio_base: 135000.00, precio: 135000.00, descuento_porcentaje: 0, stock: 6, categoria_nombre: 'Gabinetes / Cases', descripcion: 'Chasis panorámico con diseño de doble cámara y flujo de aire.' },
-  { id: 20, nombre: 'Gabinete Corsair 4000D Airflow Mid-Tower', precio_base: 68000.00, precio: 68000.00, descuento_porcentaje: 0, stock: 11, categoria_nombre: 'Gabinetes / Cases', descripcion: 'Gabinete optimizado con frontal de malla metálica de gran ventilación.' },
-  { id: 21, nombre: 'Gabinete Lian Li O11 Dynamic EVO RGB', precio_base: 125000.00, precio: 125000.00, descuento_porcentaje: 0, stock: 5, categoria_nombre: 'Gabinetes / Cases', descripcion: 'Gabinete premium de vidrio doble para lucir tu hardware.' },
-
-  // 8. Enfriamiento Líquido
-  { id: 22, nombre: 'Enfriamiento Líquido NZXT Kraken Elite 360 RGB', precio_base: 165000.00, precio: 165000.00, descuento_porcentaje: 0, stock: 5, categoria_nombre: 'Enfriamiento Líquido', descripcion: 'AIO 360mm con pantalla LCD personalizable y ventiladores RGB.' },
-  { id: 23, nombre: 'Disipador Thermalright Peerless Assassin 120 SE', precio_base: 38000.00, precio: 38000.00, descuento_porcentaje: 0, stock: 16, categoria_nombre: 'Enfriamiento Líquido', descripcion: 'Disipador de aire de torre doble con 6 heatpipes de cobre.' },
-  { id: 24, nombre: 'Enfriamiento Líquido Corsair iCUE H150i Elite LCD', precio_base: 175000.00, precio: 175000.00, descuento_porcentaje: 0, stock: 3, categoria_nombre: 'Enfriamiento Líquido', descripcion: 'Sistema AIO de triple radiador de 360mm con pantalla IPS LCD.' },
-
-  // 9. Ventiladores / Fans
-  { id: 25, nombre: 'Kit 3x Ventiladores Lian Li UNI FAN SL-Infinity 120 RGB', precio_base: 65000.00, precio: 65000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Ventiladores / Fans', descripcion: 'Ventiladores modulares de encaje sin cables con efecto espejo infinito.' },
-  { id: 26, nombre: 'Kit 3x Ventiladores Corsair LL120 RGB Dual Light', precio_base: 52000.00, precio: 52000.00, descuento_porcentaje: 0, stock: 10, categoria_nombre: 'Ventiladores / Fans', descripcion: 'Ventiladores de doble aro de iluminación RGB programable.' },
-  { id: 27, nombre: 'Ventilador Noctua NF-A12x25 PWM 120mm Silencioso', precio_base: 22000.00, precio: 22000.00, descuento_porcentaje: 0, stock: 15, categoria_nombre: 'Ventiladores / Fans', descripcion: 'Ventilador ultra silencioso con polímero Sterrox de máxima durabilidad.' },
-
-  // 10. Periféricos
-  { id: 28, nombre: 'Monitor Gaming ASUS TUF 27" 180Hz 1ms IPS', precio_base: 155000.00, precio: 155000.00, descuento_porcentaje: 0, stock: 7, categoria_nombre: 'Periféricos', descripcion: 'Monitor gaming 1440p QHD de tasa de refresco ultra fluida.' },
-  { id: 29, nombre: 'Teclado Mecánico Razer BlackWidow V4', precio_base: 95000.00, precio: 80750.00, descuento_porcentaje: 15, stock: 10, categoria_nombre: 'Periféricos', descripcion: 'Teclado mecánico con switches táctiles e iluminación RGB.' },
-  { id: 30, nombre: 'Mouse Inalámbrico Logitech G502 LIGHTSPEED', precio_base: 62000.00, precio: 62000.00, descuento_porcentaje: 0, stock: 12, categoria_nombre: 'Periféricos', descripcion: 'Mouse icónico con sensor HERO 25K de alta precisión.' },
-
-  // 11. PCs Completas
-  { id: 31, nombre: 'PC Gamer BattleBox Ryzen 5 RTX 4060', precio_base: 580000.00, precio: 580000.00, descuento_porcentaje: 0, stock: 3, categoria_nombre: 'PCs Completas', descripcion: 'Computadora armada lista para jugar a 1080p.' },
-  { id: 32, nombre: 'PC Master Race Ryzen 7 RTX 4080 Super', precio_base: 1350000.00, precio: 1350000.00, descuento_porcentaje: 0, stock: 2, categoria_nombre: 'PCs Completas', descripcion: 'Potencia bruta para 4K Gaming extrema.' },
-  { id: 33, nombre: 'PC Entry Gamer Intel i5 GTX 1650', precio_base: 350000.00, precio: 350000.00, descuento_porcentaje: 0, stock: 5, categoria_nombre: 'PCs Completas', descripcion: 'Equipo económico perfecto para eSports e iniciación.' },
-
-  // 12. Accesorios
-  { id: 34, nombre: 'Soporte Vertical GPU Cooler Master Universal', precio_base: 28000.00, precio: 28000.00, descuento_porcentaje: 0, stock: 8, categoria_nombre: 'Accesorios', descripcion: 'Kit de montaje vertical con cable Riser PCIe 4.0.' },
-  { id: 35, nombre: 'Pasta Térmica Arctic MX-6 High Performance 4g', precio_base: 7500.00, precio: 7500.00, descuento_porcentaje: 0, stock: 25, categoria_nombre: 'Accesorios', descripcion: 'Compuesto térmico de micropartículas de carbono para CPU/GPU.' },
-  { id: 36, nombre: 'Mousepad Extra Large RGB Gaming 90x40cm', precio_base: 14000.00, precio: 14000.00, descuento_porcentaje: 0, stock: 18, categoria_nombre: 'Accesorios', descripcion: 'Alfombrilla extendida impermeabilizada con borde iluminado.' },
-
-  // 13. Audífonos
-  { id: 37, nombre: 'Audífonos Logitech G PRO X Wireless', precio_base: 125000.00, precio: 125000.00, descuento_porcentaje: 0, stock: 6, categoria_nombre: 'Audífonos', descripcion: 'Audífonos inalámbricos con tecnología de micrófono BLUE VO!CE.' },
-  { id: 38, nombre: 'Audífonos HyperX Cloud II Wireless', precio_base: 85000.00, precio: 85000.00, descuento_porcentaje: 0, stock: 9, categoria_nombre: 'Audífonos', descripcion: 'Comodidad legendaria con sonido envolvente 7.1 virtual.' },
-  { id: 39, nombre: 'Audífonos Razer BlackShark V2 Pro Wireless', precio_base: 98000.00, precio: 98000.00, descuento_porcentaje: 0, stock: 7, categoria_nombre: 'Audífonos', descripcion: 'Audífonos de eSports con micrófono de banda ultra ancha.' }
+  // 7. Accesorios y Conectividad
+  { id: 36, nombre: 'Fuente de Poder 12V 10A Tipo Malla para 8 Cámaras', precio_base: 21000.00, precio: 21000.00, descuento_porcentaje: 0, stock: 25, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Fuente conmutada centralizada regulada de alta estabilidad con potenciómetro de ajuste de voltaje.' },
+  { id: 37, nombre: 'Fuente de Poder Regulada 12V 2A para Cámara Individual', precio_base: 7000.00, precio: 7000.00, descuento_porcentaje: 0, stock: 60, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Adaptador de pared estándar 12V 2000mA con conector macho 5.5x2.1mm para cámaras y routers.' },
+  { id: 38, nombre: 'Kit Par de Video Baluns Pasivos HD 4K con Conector BNC', precio_base: 5000.00, precio: 5000.00, descuento_porcentaje: 0, stock: 70, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1NFDfE6KbW0XTcgqn_dYwnEOqotpwNrG0', descripcion: 'Transceptores pasivos para transmitir video de alta definición a través de cable UTP hasta 300 metros.' },
+  { id: 39, nombre: 'Paquete de 10 Conectores Macho DC 12V con Tornillo', precio_base: 4000.00, precio: 4000.00, descuento_porcentaje: 0, stock: 80, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Conectores rápidos sin soldadura para energizar cámaras de seguridad de forma prolija.' },
+  { id: 40, nombre: 'Paquete de 10 Conectores Hembra DC 12V con Tornillo', precio_base: 4000.00, precio: 4000.00, descuento_porcentaje: 0, stock: 80, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Conectores hembra de bornera rápida para empalmes y extensiones de alimentación.' },
+  { id: 41, nombre: 'Rollo de Cable UTP Cat6 100% Cobre para CCTV (305m)', precio_base: 70000.00, precio: 66500.00, descuento_porcentaje: 5, stock: 15, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Bobina de cable de red categoría 6 con conductores de cobre puro para máxima velocidad y distancia en video HD.' },
+  { id: 42, nombre: 'Caja de Registro Plástica 10x10cm Estanca para Cámaras', precio_base: 3500.00, precio: 3500.00, descuento_porcentaje: 0, stock: 100, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1NFDfE6KbW0XTcgqn_dYwnEOqotpwNrG0', descripcion: 'Caja de montaje impermeable IP65 para proteger baluns, cables y conectores a la intemperie.' },
+  { id: 43, nombre: 'Batería de Respaldo Recargable 12V 7Ah para Alarma y Cerco', precio_base: 19500.00, precio: 19500.00, descuento_porcentaje: 0, stock: 30, categoria_nombre: 'Accesorios y Conectividad', imagen: 'https://lh3.googleusercontent.com/d/1g82HdfiMbyi-xSJFQakoRJSxHqKMZbnV', descripcion: 'Batería sellada libre de mantenimiento para mantener el cerco y la alarma encendidos ante cortes de luz.' }
 ];
 
 export default function App() {
+  const { width: windowWidth } = useWindowDimensions();
+  const numColumns = windowWidth >= 1100 ? 3 : windowWidth >= 700 ? 2 : 1;
+
   // Catálogo de productos y estado de carga
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -150,18 +150,53 @@ export default function App() {
   const [sesionPrevia, setSesionPrevia] = useState(null);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('Todas');
   const [mostrarMenuCategorias, setMostrarMenuCategorias] = useState(false);
+  const [modalSelectorTarget, setModalSelectorTarget] = useState(null);
 
   // Login de personal interno (Admin y Vendedores únicamente)
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [segundosBloqueoLogin, setSegundosBloqueoLogin] = useState(0);
 
-  // Recuperación de Contraseña por Correo (Personal Interno)
-  const [mostrarRecuperarModal, setMostrarRecuperarModal] = useState(false);
-  const [pasoRecuperacion, setPasoRecuperacion] = useState(1);
+  // Doble Factor 2FA en el Inicio de Sesión (Google Authenticator)
+  const [loginRequiere2FA, setLoginRequiere2FA] = useState(false);
+  const [loginTempToken2FA, setLoginTempToken2FA] = useState('');
+  const [loginCodigo2FA, setLoginCodigo2FA] = useState('');
+  const [loginEmailPendiente, setLoginEmailPendiente] = useState('');
+
+  // Estados para Módulo de Configuración de Cuenta y Perfil
+  const [usuarioNombre, setUsuarioNombre] = useState('');
+  const [perfilUsuario, setPerfilUsuario] = useState(null);
+  const [cargandoPerfil, setCargandoPerfil] = useState(false);
+  const [cambioPwdActual, setCambioPwdActual] = useState('');
+  const [cambioPwdNueva, setCambioPwdNueva] = useState('');
+  const [cambioPwdConfirmar, setCambioPwdConfirmar] = useState('');
+  const [cargandoCambioPwd, setCargandoCambioPwd] = useState(false);
+  const [cambioEmailNuevo, setCambioEmailNuevo] = useState('');
+  const [cambioEmailPassword, setCambioEmailPassword] = useState('');
+  const [cargandoCambioEmail, setCargandoCambioEmail] = useState(false);
+
+  // Recuperación de Contraseña (Gmail OTP y 2FA TOTP Google Authenticator)
+  const [pasoRecuperacion, setPasoRecuperacion] = useState(1); // 1: Correo / Método, 2: Código 6 dígitos, 3: Nueva Contraseña
   const [recuperarEmail, setRecuperarEmail] = useState('');
+  const [emailEnmascarado, setEmailEnmascarado] = useState('');
+  const [metodoRecuperacion, setMetodoRecuperacion] = useState('gmail'); // 'gmail' o 'totp'
+  const [totpHabilitado, setTotpHabilitado] = useState(false);
+  const [mostrarOpcionesMetodo, setMostrarOpcionesMetodo] = useState(false);
   const [codigoRecuperacion, setCodigoRecuperacion] = useState('');
+  const [tokenRecuperacion, setTokenRecuperacion] = useState('');
   const [nuevaPasswordRecuperacion, setNuevaPasswordRecuperacion] = useState('');
+  const [confirmarPasswordRecuperacion, setConfirmarPasswordRecuperacion] = useState('');
   const [cargandoRecuperacion, setCargandoRecuperacion] = useState(false);
+  const [segundosReenvioCorreo, setSegundosReenvioCorreo] = useState(0);
+
+  // Estados para configuración de 2FA TOTP (Google Authenticator)
+  const [modal2FAVisible, setModal2FAVisible] = useState(false);
+  const [modalDesactivar2FAVisible, setModalDesactivar2FAVisible] = useState(false);
+  const [claveODesactivar2FA, setClaveODesactivar2FA] = useState('');
+  const [datosConfiguracion2FA, setDatosConfiguracion2FA] = useState(null);
+  const [codigoActivacion2FA, setCodigoActivacion2FA] = useState('');
+  const [estado2FAUsuario, setEstado2FAUsuario] = useState(false);
+  const [cargando2FA, setCargando2FA] = useState(false);
 
   // Módulo de Carrito y Formulario de Facturación del Cliente
   const [mostrarCarritoModal, setMostrarCarritoModal] = useState(false);
@@ -187,10 +222,10 @@ export default function App() {
   const [filtroNombreReabastecer, setFiltroNombreReabastecer] = useState('');
   const [filtroCategoriaReabastecer, setFiltroCategoriaReabastecer] = useState('Todas');
 
-  // Control de pestañas para el Vendedor ('pos', 'ordenes_ventas', 'ordenes_ensambles')
+  // Control de pestañas para el Vendedor ('pos', 'ordenes_ventas', 'configuracion')
   const [pestanaVendedor, setPestanaVendedor] = useState('pos');
 
-  // Formulario para crear un componente de PC nuevo
+  // Formulario para crear un producto nuevo
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoDescripcion, setNuevoDescripcion] = useState('');
   const [nuevoStock, setNuevoStock] = useState('');
@@ -203,7 +238,7 @@ export default function App() {
   const [nuevaCategoriaDescripcion, setNuevaCategoriaDescripcion] = useState('');
   const [mostrarNuevaCategoriaForm, setMostrarNuevaCategoriaForm] = useState(false);
 
-  // Formulario para editar un componente existente
+  // Formulario para editar un producto existente
   const [editProductoId, setEditProductoId] = useState('');
   const [editNombre, setEditNombre] = useState('');
   const [editDescripcion, setEditDescripcion] = useState('');
@@ -223,59 +258,65 @@ export default function App() {
   const [rastreoVenta, setRastreoVenta] = useState(null);
   const [mostrarRastreador, setMostrarRastreador] = useState(false);
 
-  // Estados para el Armador de PC Completo (10 componentes)
-  const [mostrarArmador, setMostrarArmador] = useState(false);
-  const [armarPaso, setArmarPaso] = useState(1);
-  const [cpuSeleccionado, setCpuSeleccionado] = useState(null);
-  const [motherboardSeleccionada, setMotherboardSeleccionada] = useState(null);
-  const [ramSeleccionada, setRamSeleccionada] = useState(null);
-  const [gpuSeleccionada, setGpuSeleccionada] = useState(null);
-  const [almacenamientoSeleccionado, setAlmacenamientoSeleccionado] = useState(null);
-  const [fuenteSeleccionada, setFuenteSeleccionada] = useState(null);
-  const [caseSeleccionado, setCaseSeleccionado] = useState(null);
-  const [enfriamientoSeleccionado, setEnfriamientoSeleccionado] = useState(null);
-  const [fansSeleccionados, setFansSeleccionados] = useState(null);
-  const [perifericoSeleccionado, setPerifericoSeleccionado] = useState(null);
-  const [esOrdenEnsambleActual, setEsOrdenEnsambleActual] = useState(false);
-  const [subPestanaOrdenes, setSubPestanaOrdenes] = useState('ventas');
-
   // Formulario para registrar personal interno
+  const [empNombre, setEmpNombre] = useState('');
   const [empEmail, setEmpEmail] = useState('');
   const [empPassword, setEmpPassword] = useState('');
   const [empRolId, setEmpRolId] = useState(''); // 1 = Admin, 2 = Vendedor
+  const [empPregunta, setEmpPregunta] = useState(PREGUNTAS_SEGURIDAD[0]);
+  const [empRespuesta, setEmpRespuesta] = useState('');
 
-  // Inicializa la carga del catálogo y del historial al montar la aplicación
+  // Temporizador regresivo estilo iPhone para bloqueo progresivo de login
   useEffect(() => {
+    if (segundosBloqueoLogin <= 0) return;
+    const interval = setInterval(() => {
+      setSegundosBloqueoLogin((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [segundosBloqueoLogin]);
+
+  // Temporizador regresivo para reenvío de código Gmail OTP (60s)
+  useEffect(() => {
+    if (segundosReenvioCorreo <= 0) return;
+    const interval = setInterval(() => {
+      setSegundosReenvioCorreo((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [segundosReenvioCorreo]);
+
+  // Inicializa la carga del catálogo, historial y servicio de notificaciones push
+  useEffect(() => {
+    notificationService.inicializarNotificaciones();
     cargarProductos();
     cargarCategorias();
     obtenerHistorialOrdenes();
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-        Notification.requestPermission();
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      let meta = document.querySelector('meta[name="referrer"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'referrer';
+        meta.content = 'no-referrer';
+        document.head.appendChild(meta);
       }
     }
   }, []);
 
-  // Carga la lista de categorías del servidor o usa mock local en desarrollo
+  // Carga la lista de categorías del servidor o usa mock local de seguridad electrónica
   const cargarCategorias = async () => {
     try {
       const datos = await apiService.get('/categorias');
       setDbCategorias(datos);
     } catch (error) {
-      // Mock de categorías completas
+      // Mock de categorías completas de seguridad electrónica
       setDbCategorias([
-        { id: 1, descripcion: 'Procesadores' },
-        { id: 2, descripcion: 'Tarjetas Madre' },
-        { id: 3, descripcion: 'Memorias RAM' },
-        { id: 4, descripcion: 'Tarjetas de Video' },
-        { id: 5, descripcion: 'Almacenamiento' },
-        { id: 6, descripcion: 'Fuentes de Poder' },
-        { id: 7, descripcion: 'Gabinetes / Cases' },
-        { id: 8, descripcion: 'Enfriamiento Líquido' },
-        { id: 9, descripcion: 'Ventiladores / Fans' },
-        { id: 10, descripcion: 'Periféricos' },
-        { id: 11, descripcion: 'PCs Completas' },
-        { id: 12, descripcion: 'Accesorios' }
+        { id: 1, descripcion: 'Cámaras de Seguridad' },
+        { id: 2, descripcion: 'Grabadores DVR y NVR' },
+        { id: 3, descripcion: 'Cercos Eléctricos' },
+        { id: 4, descripcion: 'Motores para Portones' },
+        { id: 5, descripcion: 'Controles y Mandos' },
+        { id: 6, descripcion: 'Alarmas y Sensores' },
+        { id: 7, descripcion: 'Accesorios y Conectividad' }
       ]);
     }
   };
@@ -286,7 +327,8 @@ export default function App() {
     try {
       const datos = await apiService.get('/productos');
       const productosConPrecio = datos.map(prod => {
-        const precioBase = Number(prod.precio_costo || 0) + Number(prod.margen_ganancia || 0);
+        const precioCalculado = Number(prod.precio_costo || 0) + Number(prod.margen_ganancia || 0);
+        const precioBase = Number(prod.precio != null && prod.precio !== undefined ? prod.precio : precioCalculado);
         const desc = Number(prod.descuento_porcentaje || 0);
         const precioFinal = desc > 0 ? (precioBase * (1 - desc / 100)) : precioBase;
         return {
@@ -327,8 +369,8 @@ export default function App() {
   // Hook useEffect que carga el historial de ventas del Administrador y Vendedor
   useEffect(() => {
     if (
-      (sesion === 'admin' && ['ordenes_ventas', 'ordenes_ensambles', 'tabla_ventas', 'ordenes'].includes(pestanaAdmin)) ||
-      (sesion === 'vendedor' && ['ordenes_ventas', 'ordenes_ensambles', 'ordenes'].includes(pestanaVendedor))
+      (sesion === 'admin' && ['ordenes_ventas', 'tabla_ventas', 'ordenes'].includes(pestanaAdmin)) ||
+      (sesion === 'vendedor' && ['ordenes_ventas', 'ordenes'].includes(pestanaVendedor))
     ) {
       obtenerHistorialOrdenes();
     }
@@ -340,7 +382,7 @@ export default function App() {
       const res = await apiService.put(`/ventas/${idOrden}/estado`, { estado: nuevoEstado });
       if (res.success) {
         Alert.alert('Orden Actualizada', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`);
-        enviarNotificacionWeb('📦 Orden Actualizada', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`);
+        enviarNotificacionMovimiento('📦 Orden Actualizada', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`, 'orden', { idOrden, nuevoEstado });
         obtenerHistorialOrdenes();
         cargarProductos(); // Refrescar stock visible en el catálogo de productos
       } else {
@@ -350,7 +392,7 @@ export default function App() {
       const nuevasOrdenes = ordenesVenta.map(o => o.id === idOrden ? { ...o, estado: nuevoEstado } : o);
       setOrdenesVenta(nuevasOrdenes);
       Alert.alert('Orden Actualizada (Modo Local)', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`);
-      enviarNotificacionWeb('📦 Orden Actualizada (Modo Local)', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`);
+      enviarNotificacionMovimiento('📦 Orden Actualizada (Modo Local)', `La orden #${idOrden} fue marcada como ${nuevoEstado.toLowerCase()}.`, 'orden', { idOrden, nuevoEstado });
     }
   };
 
@@ -379,7 +421,7 @@ export default function App() {
           </head>
           <body>
             <div class="header">
-              <h1>PC BUILDER EXPRESS</h1>
+              <h1>JLK SOLUTIONS SECURITY</h1>
               <p>Factura Comercial de Compra</p>
               <p>San José, Costa Rica | Tel: 4000-1000</p>
             </div>
@@ -397,11 +439,11 @@ export default function App() {
             </div>
 
             <div class="section">
-              <div class="section-title">Resumen de Componentes</div>
+              <div class="section-title">Resumen de Productos</div>
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Componente</th>
+                    <th>Producto</th>
                     <th style="text-align: right;">Total</th>
                   </tr>
                 </thead>
@@ -428,7 +470,7 @@ export default function App() {
             </div>
 
             <div class="footer">
-              ¡Gracias por preferir PC Builder Express! Garantía de 1 año en todos nuestros componentes de PC.
+              ¡Gracias por su compra en JLK Solutions Security!
             </div>
           </body>
         </html>
@@ -441,35 +483,14 @@ export default function App() {
     }
   };
 
-  // Clasificación inteligente y precisa para Órdenes de Ensamble vs. Ventas Directas
-  const esOrdenEnsambleCheck = (o) => {
-    if (!o) return false;
-    if (o.tipo_orden === 'ensamble') return true;
-    if (o.descripcion) {
-      const desc = o.descripcion.toLowerCase();
-      if (
-        desc.includes('ensamble') ||
-        desc.includes('servicio de armado') ||
-        desc.includes('battlebox') ||
-        desc.includes('pc gamer') ||
-        desc.includes('pc master race') ||
-        desc.includes('combo de ensamble')
-      ) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  // Renderiza una tarjeta de orden con sus respectivas acciones
+  // Renderiza una tarjeta de orden de venta con sus respectivas acciones
   const renderTarjetaOrden = ({ item }) => {
     const estadoNormalizado = (item.estado || 'Pendiente').trim();
-    const esEnsamble = esOrdenEnsambleCheck(item);
 
     return (
       <View style={styles.tarjetaOrden}>
         <View style={styles.filaOrdenHeader}>
-          <Text style={[styles.ordenIdTexto, { fontSize: 18, color: '#38bdf8', fontWeight: '950' }]}>Orden #{item.id}</Text>
+          <Text style={[styles.ordenIdTexto, { fontSize: 18, color: '#6cc04a', fontWeight: '950' }]}>Orden #{item.id}</Text>
           <Text style={[
             styles.ordenEstadoEtiqueta,
             estadoNormalizado === 'Entregado' || estadoNormalizado === 'Completado'
@@ -482,10 +503,10 @@ export default function App() {
           </Text>
         </View>
 
-        {/* Badge de tipo de orden */}
-        <View style={{ alignSelf: 'flex-start', marginVertical: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: esEnsamble ? '#c2410c' : '#0369a1' }}>
-          <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '900' }}>
-            {esEnsamble ? '⚙️ ORDEN DE ENSAMBLE' : '🏷️ VENTA DIRECTA'}
+        {/* Badge de orden de venta */}
+        <View style={{ alignSelf: 'flex-start', marginVertical: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: '#ea580c' }}>
+          <Text style={{ color: '#1c2b22', fontSize: 10, fontWeight: '900' }}>
+            🏷️ ORDEN DE VENTA
           </Text>
         </View>
 
@@ -502,57 +523,22 @@ export default function App() {
           {/* Botones de Transición de Estados (Exclusivos para Vendedor) */}
           {sesion === 'vendedor' && (
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 6 }}>
-              {esEnsamble ? (
-                // Flujo para Ensambles: Ensamblar -> Listo -> Entregar
-                <>
-                  {(estadoNormalizado === 'Pendiente' || estadoNormalizado === 'En Proceso') && (
-                    <TouchableOpacity
-                      style={[styles.botonAccionOrden, { backgroundColor: '#3b82f6' }]}
-                      onPress={() => cambiarEstadoOrden(item.id, 'Ensamblando')}
-                    >
-                      <Text style={styles.botonAccionOrdenTexto}>🛠️ Ensamblar</Text>
-                    </TouchableOpacity>
-                  )}
+              {(estadoNormalizado === 'Pendiente' || estadoNormalizado === 'En Proceso') && (
+                <TouchableOpacity
+                  style={[styles.botonAccionOrden, { backgroundColor: '#eab308' }]}
+                  onPress={() => cambiarEstadoOrden(item.id, 'Listo para Retirar')}
+                >
+                  <Text style={[styles.botonAccionOrdenTexto, { color: '#000000' }]}>📦 Listo</Text>
+                </TouchableOpacity>
+              )}
 
-                  {estadoNormalizado === 'Ensamblando' && (
-                    <TouchableOpacity
-                      style={[styles.botonAccionOrden, { backgroundColor: '#eab308' }]}
-                      onPress={() => cambiarEstadoOrden(item.id, 'Listo para Retirar')}
-                    >
-                      <Text style={[styles.botonAccionOrdenTexto, { color: '#000000' }]}>📦 Listo Retiro</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {estadoNormalizado === 'Listo para Retirar' && (
-                    <TouchableOpacity
-                      style={[styles.botonAccionOrden, { backgroundColor: '#10b981' }]}
-                      onPress={() => cambiarEstadoOrden(item.id, 'Entregado')}
-                    >
-                      <Text style={styles.botonAccionOrdenTexto}>✅ Entregar</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                // Flujo para Ventas Directas: Listo -> Entregar (Omitiendo Ensamblaje)
-                <>
-                  {(estadoNormalizado === 'Pendiente' || estadoNormalizado === 'En Proceso' || estadoNormalizado === 'Ensamblando') && (
-                    <TouchableOpacity
-                      style={[styles.botonAccionOrden, { backgroundColor: '#eab308' }]}
-                      onPress={() => cambiarEstadoOrden(item.id, 'Listo para Retirar')}
-                    >
-                      <Text style={[styles.botonAccionOrdenTexto, { color: '#000000' }]}>📦 Listo</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {estadoNormalizado === 'Listo para Retirar' && (
-                    <TouchableOpacity
-                      style={[styles.botonAccionOrden, { backgroundColor: '#10b981' }]}
-                      onPress={() => cambiarEstadoOrden(item.id, 'Entregado')}
-                    >
-                      <Text style={styles.botonAccionOrdenTexto}>✅ Entregar</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
+              {estadoNormalizado === 'Listo para Retirar' && (
+                <TouchableOpacity
+                  style={[styles.botonAccionOrden, { backgroundColor: '#22a34a' }]}
+                  onPress={() => cambiarEstadoOrden(item.id, 'Entregado')}
+                >
+                  <Text style={styles.botonAccionOrdenTexto}>✅ Entregar</Text>
+                </TouchableOpacity>
               )}
 
               {estadoNormalizado !== 'Entregado' && estadoNormalizado !== 'Completado' && estadoNormalizado !== 'Cancelado' && (
@@ -568,7 +554,7 @@ export default function App() {
 
           {/* Botón para abrir el Modal con el Desglose de Productos de la Orden */}
           <TouchableOpacity
-            style={[styles.botonAccionOrden, { backgroundColor: '#0284c7', width: '100%', marginHorizontal: 0, paddingVertical: 12, marginBottom: 6 }]}
+            style={[styles.botonAccionOrden, { backgroundColor: '#f97316', width: '100%', marginHorizontal: 0, paddingVertical: 12, marginBottom: 6 }]}
             onPress={() => setOrdenSeleccionadaDetalle(item)}
           >
             <Text style={styles.botonAccionOrdenTexto}>👁️ Ver Detalle Completo de Productos</Text>
@@ -576,7 +562,7 @@ export default function App() {
 
           {/* Botón de Generar Factura PDF (Siempre visible para Administradores y Vendedores) */}
           <TouchableOpacity
-            style={[styles.botonAccionOrden, { backgroundColor: '#4b5563', width: '100%', marginHorizontal: 0, paddingVertical: 12 }]}
+            style={[styles.botonAccionOrden, { backgroundColor: '#b9d4ae', width: '100%', marginHorizontal: 0, paddingVertical: 12 }]}
             onPress={() => generarFacturaPDF(item)}
           >
             <Text style={styles.botonAccionOrdenTexto}>📄 Generar Factura PDF</Text>
@@ -586,25 +572,50 @@ export default function App() {
     );
   };
 
-  // Autentica credenciales restringiendo el login a Admin y Vendedor únicamente
+  // Autentica credenciales restringiendo el login a Admin y Vendedor únicamente contra MySQL
   const manejarLogin = async () => {
-    if (!loginEmail || !loginPassword) {
+    if (segundosBloqueoLogin > 0) {
+      const min = Math.floor(segundosBloqueoLogin / 60);
+      const seg = segundosBloqueoLogin % 60;
+      Alert.alert(
+        'Acceso Bloqueado',
+        `El acceso está temporalmente bloqueado por seguridad. Inténtalo de nuevo en ${min > 0 ? `${min}m ${seg}s` : `${seg}s`}.`
+      );
+      return;
+    }
+
+    const emailLimpio = loginEmail.trim();
+    if (!emailLimpio || !loginPassword) {
       Alert.alert('Campos requeridos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
 
     try {
-      const res = await apiService.post('/login', { email: loginEmail, password: loginPassword });
+      const res = await apiService.post('/login', { email: emailLimpio, password: loginPassword });
 
-      if (res.success) {
+      if (res && res.success) {
+        if (res.requiere2FA) {
+          // El usuario tiene Google Authenticator activo: solicitar segundo factor
+          setLoginRequiere2FA(true);
+          setLoginTempToken2FA(res.tokenTemporal);
+          setLoginEmailPendiente(emailLimpio);
+          setLoginCodigo2FA('');
+          return;
+        }
+
+        setSegundosBloqueoLogin(0);
+        const nombreDetectado = res.nombre || (res.rol === 1 ? 'Luis Martínez' : (emailLimpio.toLowerCase().includes('admin') ? 'Luis Martínez' : 'Joseph Silva'));
+        setUsuarioNombre(nombreDetectado);
+
         if (res.rol === 1) {
           const tokenSesion = res.token || 'session_token_' + res.email;
           setToken(tokenSesion);
           setAuthToken(tokenSesion);
           setSesion('admin');
           setPestanaAdmin('tabla_ventas');
-          Alert.alert('Acceso Autorizado', 'Sesión iniciada como Administrador.');
-          enviarNotificacionWeb('🔓 Inicio de Sesión', `Administrador inició sesión: ${res.email || loginEmail}`);
+          cargarPerfilUsuario();
+          enviarNotificacionMovimiento('🔐 Inicio de Sesión', `${nombreDetectado} inició sesión (Administrador).`, 'login');
+          Alert.alert('Acceso Autorizado', `Bienvenido, ${nombreDetectado} (Administrador).`);
           setLoginEmail('');
           setLoginPassword('');
         } else if (res.rol === 2) {
@@ -612,126 +623,420 @@ export default function App() {
           setToken(tokenSesion);
           setAuthToken(tokenSesion);
           setSesion('vendedor');
-          Alert.alert('Acceso Autorizado', 'Sesión iniciada como Vendedor.');
-          enviarNotificacionWeb('🔓 Inicio de Sesión', `Vendedor inició sesión: ${res.email || loginEmail}`);
+          setPestanaVendedor('pos');
+          cargarPerfilUsuario();
+          enviarNotificacionMovimiento('🔐 Inicio de Sesión', `${nombreDetectado} inició sesión (Vendedor).`, 'login');
+          Alert.alert('Acceso Autorizado', `Bienvenido, ${nombreDetectado} (Vendedor).`);
           setLoginEmail('');
           setLoginPassword('');
         } else {
           Alert.alert('Acceso Denegado', 'Solo el personal autorizado (Vendedor o Administrador) puede iniciar sesión.');
-          enviarNotificacionWeb('⚠️ Intento de Acceso Fallido', `Acceso denegado (Rol no autorizado) para: ${loginEmail}`);
         }
       } else {
-        Alert.alert('Acceso Denegado', 'Credenciales incorrectas.');
-        enviarNotificacionWeb('⚠️ Intento de Acceso Fallido', `Contraseña errónea para: ${loginEmail}`);
+        Alert.alert('Acceso Denegado', (res && res.message) || 'Credenciales incorrectas.');
       }
     } catch (error) {
-      if (error.status) {
+      if (error && error.data && error.data.bloqueado) {
+        // Bloqueo progresivo estilo iPhone activado tras 5 intentos
+        const segs = error.data.segundosRestantes || 60;
+        setSegundosBloqueoLogin(segs);
+        Alert.alert('Acceso Bloqueado (Seguridad)', error.message || 'Has superado el límite de intentos.');
+      } else if (error && error.data && error.data.intentosRestantes !== undefined) {
+        Alert.alert('Contraseña Incorrecta', error.message);
+      } else if (error && error.status) {
         Alert.alert('Acceso Denegado', error.message || 'Credenciales incorrectas.');
-        enviarNotificacionWeb('⚠️ Intento de Acceso Fallido', `Contraseña errónea para: ${loginEmail}`);
       } else {
-        ejecutarLoginLocal();
+        // Modo offline / contingencia si el servidor está apagado
+        if (emailLimpio.toLowerCase().includes('admin')) {
+          setUsuarioNombre('Luis Martínez');
+          setSesion('admin');
+          setPestanaAdmin('tabla_ventas');
+          enviarNotificacionMovimiento('🔐 Inicio de Sesión', 'Luis Martínez inició sesión (Administrador).', 'login');
+          Alert.alert('Acceso Autorizado (Modo Offline)', 'Sesión iniciada como Luis Martínez (Administrador).');
+          setLoginEmail('');
+          setLoginPassword('');
+        } else if (emailLimpio.toLowerCase().includes('vendedor')) {
+          setUsuarioNombre('Joseph Silva');
+          setSesion('vendedor');
+          setPestanaVendedor('pos');
+          enviarNotificacionMovimiento('🔐 Inicio de Sesión', 'Joseph Silva inició sesión (Vendedor).', 'login');
+          Alert.alert('Acceso Autorizado (Modo Offline)', 'Sesión iniciada como Joseph Silva (Vendedor).');
+          setLoginEmail('');
+          setLoginPassword('');
+        } else {
+          Alert.alert('Error de Conexión', 'El backend no está conectado. Usa admin@demo.com o vendedor@demo.com para probar en modo local.');
+        }
       }
     }
   };
 
-  // Login local de desarrollo restringido para Admin/Vendedor
-  const ejecutarLoginLocal = () => {
-    const emailLower = loginEmail.toLowerCase();
+  // Valida el código 2FA de Google Authenticator durante el inicio de sesión
+  const verificarLogin2FA = async () => {
+    if (loginCodigo2FA.trim().length !== 6) {
+      Alert.alert('Código Incompleto', 'Por favor ingresa los 6 dígitos que muestra Google Authenticator.');
+      return;
+    }
 
-    if (emailLower.includes('admin')) {
-      const tokenSesion = 'local_session_' + loginEmail;
-      setToken(tokenSesion);
-      setAuthToken(tokenSesion);
-      setSesion('admin');
-      setPestanaAdmin('tabla_ventas');
-      Alert.alert('Acceso Autorizado', 'Sesión iniciada como Administrador.');
-      enviarNotificacionWeb('🔓 Inicio de Sesión', `Administrador inició sesión: ${loginEmail}`);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else if (emailLower.includes('vendedor') || emailLower.includes('vend')) {
-      const tokenSesion = 'local_session_' + loginEmail;
-      setToken(tokenSesion);
-      setAuthToken(tokenSesion);
-      setSesion('vendedor');
-      Alert.alert('Acceso Autorizado', 'Sesión iniciada como Vendedor.');
-      enviarNotificacionWeb('🔓 Inicio de Sesión', `Vendedor inició sesión: ${loginEmail}`);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else {
-      Alert.alert('Acceso Denegado', 'Solo el personal autorizado (Vendedor o Administrador) puede iniciar sesión.');
-      enviarNotificacionWeb('⚠️ Intento de Acceso Fallido', `Acceso denegado para: ${loginEmail}`);
+    try {
+      const res = await apiService.postConEstado('/login/verificar-2fa', {
+        email: loginEmailPendiente,
+        tokenTemporal: loginTempToken2FA,
+        codigo: loginCodigo2FA.trim(),
+      });
+
+      if (res && res.success && res.token) {
+        setLoginRequiere2FA(false);
+        setLoginTempToken2FA('');
+        setLoginCodigo2FA('');
+        setSegundosBloqueoLogin(0);
+        const tokenSesion = res.token;
+        setToken(tokenSesion);
+        setAuthToken(tokenSesion);
+        const nombreDetectado = res.nombre || (res.rol === 1 ? 'Luis Martínez' : 'Joseph Silva');
+        setUsuarioNombre(nombreDetectado);
+        if (res.rol === 1) {
+          setSesion('admin');
+          setPestanaAdmin('tabla_ventas');
+        } else {
+          setSesion('vendedor');
+          setPestanaVendedor('pos');
+        }
+        cargarPerfilUsuario();
+        Alert.alert('Autenticación Exitosa', `Verificación 2FA completada. Bienvenido, ${nombreDetectado}.`);
+        const rolTexto = res.rol === 1 ? 'Administrador' : 'Vendedor';
+        enviarNotificacionMovimiento('🔐 Inicio de Sesión', `${nombreDetectado} inició sesión (${rolTexto}).`, 'login');
+        setLoginEmail('');
+        setLoginPassword('');
+      } else {
+        Alert.alert('Código Incorrecto', res.message || 'El código 2FA no coincide o ya expiró.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo conectar con el servidor para validar 2FA.');
     }
   };
 
-  // Solicita el envío del código de recuperación por correo
-  const solicitarCodigoRecuperacion = async () => {
-    if (!recuperarEmail) {
+  // Carga los datos del perfil y estado de 2FA del usuario conectado
+  const cargarPerfilUsuario = async () => {
+    setCargandoPerfil(true);
+    try {
+      const res = await apiService.get('/usuarios/perfil');
+      if (res && res.success && res.usuario) {
+        setPerfilUsuario(res.usuario);
+        if (res.usuario.nombre) {
+          setUsuarioNombre(res.usuario.nombre);
+        }
+        setEstado2FAUsuario(Boolean(res.usuario.totp_activo));
+      }
+    } catch (e) {
+      console.log('Error al cargar perfil:', e);
+    } finally {
+      setCargandoPerfil(false);
+    }
+  };
+
+  // Cambiar contraseña desde el módulo de configuración
+  const ejecutarCambioPassword = async () => {
+    if (!cambioPwdActual || !cambioPwdNueva) {
+      Alert.alert('Campos Requeridos', 'Por favor ingresa tu contraseña actual y la nueva contraseña.');
+      return;
+    }
+    const errores = validarPasswordSegura(cambioPwdNueva);
+    if (errores.length) {
+      Alert.alert('Contraseña Débil', `La nueva contraseña debe tener: ${errores.join(', ')}.`);
+      return;
+    }
+    if (cambioPwdNueva !== cambioPwdConfirmar) {
+      Alert.alert('No Coinciden', 'La confirmación no coincide con la nueva contraseña.');
+      return;
+    }
+
+    setCargandoCambioPwd(true);
+    try {
+      const res = await apiService.postConEstado('/usuarios/cambiar-password', {
+        passwordActual: cambioPwdActual,
+        nuevaPassword: cambioPwdNueva,
+      });
+
+      if (res && res.success) {
+        Alert.alert('✅ Contraseña Actualizada', 'Tu contraseña ha sido cambiada exitosamente.');
+        setCambioPwdActual('');
+        setCambioPwdNueva('');
+        setCambioPwdConfirmar('');
+      } else {
+        Alert.alert('Error', res.message || 'No se pudo actualizar la contraseña.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Error de conexión con el servidor.');
+    } finally {
+      setCargandoCambioPwd(false);
+    }
+  };
+
+  // Cambiar correo desde el módulo de configuración
+  const ejecutarCambioEmail = async () => {
+    const nuevo = cambioEmailNuevo.trim().toLowerCase();
+    if (!nuevo || !cambioEmailPassword) {
+      Alert.alert('Campos Requeridos', 'Ingresa el nuevo correo y tu contraseña actual para confirmar.');
+      return;
+    }
+    if (!nuevo.includes('@') || !nuevo.includes('.')) {
+      Alert.alert('Correo Inválido', 'Por favor ingresa un correo electrónico válido.');
+      return;
+    }
+
+    setCargandoCambioEmail(true);
+    try {
+      const res = await apiService.postConEstado('/usuarios/cambiar-email', {
+        nuevoEmail: nuevo,
+        password: cambioEmailPassword,
+      });
+
+      if (res && res.success) {
+        Alert.alert('✅ Correo Actualizado', `Tu correo fue cambiado a: ${nuevo}`);
+        setCambioEmailNuevo('');
+        setCambioEmailPassword('');
+        cargarPerfilUsuario();
+      } else {
+        Alert.alert('Error', res.message || 'No se pudo actualizar el correo.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Error de conexión al cambiar correo.');
+    } finally {
+      setCargandoCambioEmail(false);
+    }
+  };
+
+  // Reinicia por completo el flujo de recuperación
+  const reiniciarRecuperacion = () => {
+    setPasoRecuperacion(1);
+    setRecuperarEmail('');
+    setEmailEnmascarado('');
+    setMetodoRecuperacion('gmail');
+    setTotpHabilitado(false);
+    setMostrarOpcionesMetodo(false);
+    setCodigoRecuperacion('');
+    setTokenRecuperacion('');
+    setNuevaPasswordRecuperacion('');
+    setConfirmarPasswordRecuperacion('');
+    setSegundosReenvioCorreo(0);
+  };
+
+  // Paso 1: Consultar métodos disponibles para el correo ingresado
+  const solicitarMetodosRecuperacion = async () => {
+    const emailLimpio = recuperarEmail.trim().toLowerCase();
+    if (!emailLimpio) {
       Alert.alert('Correo Requerido', 'Por favor ingresa tu correo electrónico registrado.');
       return;
     }
     setCargandoRecuperacion(true);
     try {
-      const res = await apiService.post('/recuperar-password', { email: recuperarEmail });
-      if (res.success) {
-        Alert.alert(
-          '📩 Código Enviado por Correo',
-          `Se ha enviado un código de verificación de 6 dígitos al correo ${recuperarEmail}.\n\n(Código simulado para pruebas: ${res.codigoSimulado})`
-        );
-        setPasoRecuperacion(2);
+      const res = await apiService.postConEstado('/recuperar/metodos', { email: emailLimpio });
+      if (res.status === 429) {
+        Alert.alert('🚫 Acceso Bloqueado', res.message || 'Demasiados intentos fallidos. Intenta más tarde.');
+        return;
+      }
+      setEmailEnmascarado(res.emailEnmascarado || emailLimpio);
+      const tieneTotp = Boolean(res.totpHabilitado);
+      setTotpHabilitado(tieneTotp);
+
+      if (tieneTotp) {
+        // La cuenta tiene 2FA configurado, se despliega selector de método
+        setMostrarOpcionesMetodo(true);
       } else {
-        Alert.alert('Error', res.message || 'No se pudo enviar el correo de recuperación.');
+        // Solo tiene Gmail: envía el código y avanza al paso 2
+        setMetodoRecuperacion('gmail');
+        const ok = await ejecutarEnvioCodigoGmail(emailLimpio);
+        if (ok) setPasoRecuperacion(2);
       }
     } catch (e) {
-      const codigoSim = Math.floor(100000 + Math.random() * 900000).toString();
-      Alert.alert(
-        '📩 Código de Recuperación Generado',
-        `Se simuló el envío al correo ${recuperarEmail}.\n\nTu código de verificación es: ${codigoSim}`
-      );
-      setPasoRecuperacion(2);
+      Alert.alert('Sin conexión', 'No se pudo conectar con el servidor.');
     } finally {
       setCargandoRecuperacion(false);
     }
   };
 
-  // Valida el código e ingresa la nueva contraseña en MySQL
-  const ejecutarRestablecerPassword = async () => {
-    if (!codigoRecuperacion || !nuevaPasswordRecuperacion) {
-      Alert.alert('Campos Requeridos', 'Ingresa el código de 6 dígitos y la nueva contraseña.');
+  // Enviar / Reenviar código OTP de 6 dígitos por Gmail
+  const ejecutarEnvioCodigoGmail = async (correo = null) => {
+    const targetEmail = (typeof correo === 'string' && correo ? correo : recuperarEmail).trim().toLowerCase();
+    setCargandoRecuperacion(true);
+    try {
+      const res = await apiService.postConEstado('/recuperar/enviar-codigo-gmail', { email: targetEmail });
+      if (res.status === 429) {
+        Alert.alert('🚫 Límite de intentos', res.message || 'Demasiados intentos. Intenta más tarde.');
+        return false;
+      }
+      if (res.success) {
+        setSegundosReenvioCorreo(60);
+        Alert.alert('📧 Código Enviado', `Hemos enviado un código numérico de 6 dígitos a ${res.emailEnmascarado || targetEmail}. Revisa tu bandeja de entrada.`);
+        enviarNotificacionWeb('Código Enviado', `Revisa tu correo ${res.emailEnmascarado || targetEmail}`);
+        return true;
+      } else {
+        Alert.alert('Error', res.message || 'No se pudo enviar el correo de verificación.');
+        return false;
+      }
+    } catch (e) {
+      Alert.alert('Sin conexión', 'No se pudo comunicar con el servidor.');
+      return false;
+    } finally {
+      setCargandoRecuperacion(false);
+    }
+  };
+
+  // Continuar tras seleccionar método cuando hay múltiples opciones (Gmail o TOTP)
+  const continuarConMetodoSeleccionado = async () => {
+    if (metodoRecuperacion === 'gmail') {
+      const ok = await ejecutarEnvioCodigoGmail();
+      if (ok) setPasoRecuperacion(2);
+    } else {
+      // Método Google Authenticator: pasa directo al paso 2
+      setPasoRecuperacion(2);
+    }
+  };
+
+  // Paso 2: Verificar el código de 6 dígitos (Gmail o Google Authenticator)
+  const verificarCodigoRecuperacion = async () => {
+    const cod = codigoRecuperacion.trim();
+    if (cod.length !== 6) {
+      Alert.alert('Código Inválido', 'Por favor ingresa el código numérico completo de 6 dígitos.');
       return;
     }
     setCargandoRecuperacion(true);
     try {
-      const res = await apiService.post('/resetear-password', {
-        email: recuperarEmail,
-        codigo: codigoRecuperacion,
-        nueva_password: nuevaPasswordRecuperacion
+      const endpoint = metodoRecuperacion === 'totp' ? '/recuperar/verificar-totp' : '/recuperar/verificar-codigo-gmail';
+      const res = await apiService.postConEstado(endpoint, {
+        email: recuperarEmail.trim().toLowerCase(),
+        codigo: cod,
       });
-      if (res.success) {
-        Alert.alert('✅ Contraseña Restablecida', 'Tu contraseña ha sido actualizada con éxito en la base de datos. Ya puedes ingresar.');
-        setSesion('auth');
-        setPasoRecuperacion(1);
-        setRecuperarEmail('');
+
+      if (res.success && res.token) {
+        setTokenRecuperacion(res.token);
         setCodigoRecuperacion('');
-        setNuevaPasswordRecuperacion('');
+        setPasoRecuperacion(3);
+      } else if (res.status === 429) {
+        Alert.alert('🚫 Cuenta Bloqueada', res.message || 'Demasiados intentos fallidos. Intenta más tarde.');
+        reiniciarRecuperacion();
+        setSesion('auth');
       } else {
-        Alert.alert('Error', res.message || 'Código incorrecto o no se pudo restablecer la contraseña.');
+        Alert.alert('Código Incorrecto', res.message || 'El código ingresado no es válido o ha expirado.');
       }
     } catch (e) {
-      Alert.alert('✅ Contraseña Restablecida (Modo Local)', 'Se actualizó tu contraseña localmente. Puedes iniciar sesión con la nueva contraseña.');
-      setSesion('auth');
-      setPasoRecuperacion(1);
-      setRecuperarEmail('');
-      setCodigoRecuperacion('');
-      setNuevaPasswordRecuperacion('');
+      Alert.alert('Sin conexión', 'Error al verificar con el servidor.');
     } finally {
       setCargandoRecuperacion(false);
+    }
+  };
+
+  // Paso 3: Guardar la nueva contraseña con el token de un solo uso
+  const ejecutarRestablecerPassword = async () => {
+    const errores = validarPasswordSegura(nuevaPasswordRecuperacion);
+    if (errores.length) {
+      Alert.alert('Contraseña Débil', `La contraseña debe tener: ${errores.join(', ')}.`);
+      return;
+    }
+    if (nuevaPasswordRecuperacion !== confirmarPasswordRecuperacion) {
+      Alert.alert('No Coinciden', 'La confirmación no coincide con la nueva contraseña.');
+      return;
+    }
+    setCargandoRecuperacion(true);
+    try {
+      const res = await apiService.postConEstado('/resetear-password', {
+        email: recuperarEmail.trim().toLowerCase(),
+        token: tokenRecuperacion,
+        nueva_password: nuevaPasswordRecuperacion,
+      });
+      if (res.success) {
+        Alert.alert('✅ Contraseña Restablecida', 'Tu contraseña fue actualizada exitosamente. Ya puedes iniciar sesión.');
+        enviarNotificacionWeb('Contraseña Actualizada', 'Tu contraseña ha sido restablecida.');
+        reiniciarRecuperacion();
+        setSesion('auth');
+      } else {
+        Alert.alert('Error', res.message || 'No se pudo restablecer la contraseña.');
+        if (res.status === 400 && /expir|inválida/i.test(res.message || '')) reiniciarRecuperacion();
+      }
+    } catch (e) {
+      Alert.alert('Sin conexión', 'No se pudo conectar con el servidor.');
+    } finally {
+      setCargandoRecuperacion(false);
+    }
+  };
+
+  // Funciones para gestionar 2FA desde la app
+  const abrirModal2FA = async (forzarRegenerar = false) => {
+    const regenerar = forzarRegenerar === true;
+    setCargando2FA(true);
+    try {
+      const estadoRes = await apiService.get('/2fa/estado');
+      setEstado2FAUsuario(Boolean(estadoRes && estadoRes.activo));
+
+      const genRes = await apiService.post('/2fa/generar', { regenerar });
+      if (genRes.success) {
+        setDatosConfiguracion2FA(genRes);
+        setCodigoActivacion2FA('');
+        setModal2FAVisible(true);
+      } else {
+        Alert.alert('Error', genRes.message || 'No se pudo preparar la configuración 2FA.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo conectar con el servidor para 2FA.');
+    } finally {
+      setCargando2FA(false);
+    }
+  };
+
+  const confirmarActivar2FA = async () => {
+    if (codigoActivacion2FA.trim().length !== 6) {
+      Alert.alert('Código Incompleto', 'Ingresa el código de 6 dígitos de Google Authenticator.');
+      return;
+    }
+    setCargando2FA(true);
+    try {
+      const res = await apiService.postConEstado('/2fa/activar', { codigo: codigoActivacion2FA.trim() });
+      if (res.success) {
+        setEstado2FAUsuario(true);
+        Alert.alert('✅ 2FA Activado', 'Google Authenticator ha quedado vinculado y activado para tu cuenta.');
+        setModal2FAVisible(false);
+      } else {
+        Alert.alert('Código Incorrecto', res.message || 'El código no coincide. Asegúrate de tener la hora sincronizada en tu teléfono.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo activar 2FA.');
+    } finally {
+      setCargando2FA(false);
+    }
+  };
+
+  const desactivar2FA = async (claveOCodigo) => {
+    const valor = (claveOCodigo || '').trim();
+    if (!valor) {
+      Alert.alert('Dato Requerido', 'Por favor ingresa tu contraseña o el código de 6 dígitos de Google Authenticator.');
+      return;
+    }
+    setCargando2FA(true);
+    try {
+      const esCodigo = /^\d{6}$/.test(valor);
+      const payload = esCodigo ? { codigo: valor } : { password: valor };
+      const res = await apiService.postConEstado('/2fa/desactivar', payload);
+      if (res.success) {
+        setEstado2FAUsuario(false);
+        setModal2FAVisible(false);
+        setModalDesactivar2FAVisible(false);
+        setClaveODesactivar2FA('');
+        Alert.alert('✅ 2FA Desactivado', 'La autenticación en dos pasos ha sido deshabilitada exitosamente.');
+      } else {
+        Alert.alert('Error', res.message || 'Contraseña o código 2FA incorrecto.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Error al desactivar 2FA.');
+    } finally {
+      setCargando2FA(false);
     }
   };
 
   // Registra un empleado (Admin/Vendedor) llamando al POST en el servidor
   const manejarRegistroEmpleado = async () => {
-    if (!empEmail || !empPassword || !empRolId) {
-      Alert.alert('Campos Incompletos', 'Por favor rellene todos los campos.');
+    const nombreLimpio = empNombre.trim();
+    if (!nombreLimpio || !empEmail.trim() || !empPassword || !empRolId || !empPregunta || !empRespuesta.trim()) {
+      Alert.alert('Campos Incompletos', 'Por favor rellene todos los campos (nombre completo, correo, contraseña, rol, pregunta y respuesta de seguridad).');
       return;
     }
 
@@ -741,35 +1046,44 @@ export default function App() {
       return;
     }
 
+    const erroresPwd = validarPasswordSegura(empPassword);
+    if (erroresPwd.length) {
+      Alert.alert('Contraseña Débil', `La contraseña debe tener: ${erroresPwd.join(', ')}.`);
+      return;
+    }
+
     try {
-      const res = await apiService.post('/usuarios/registro', {
-        email: empEmail,
+      const res = await apiService.postConEstado('/usuarios/registro', {
+        nombre: nombreLimpio,
+        email: empEmail.trim(),
         password: empPassword,
-        rol_id: rolIdNum
+        rol_id: rolIdNum,
+        pregunta_seguridad: empPregunta,
+        respuesta_seguridad: empRespuesta
       });
 
       if (res.success) {
-        Alert.alert('Personal Registrado', `Se guardó al empleado ${empEmail} con Rol ID ${rolIdNum}.`);
-        enviarNotificacionWeb('👤 Personal Registrado', `Se guardó al empleado ${empEmail} con Rol ID ${rolIdNum}.`);
+        const rolTexto = rolIdNum === 1 ? 'Administrador' : 'Vendedor';
+        Alert.alert('Personal Registrado', `Se guardó a ${nombreLimpio} con el rol de ${rolTexto}.`);
+        enviarNotificacionWeb('Personal Registrado', `Se registró a ${nombreLimpio} como ${rolTexto}.`);
+        setEmpNombre('');
         setEmpEmail('');
         setEmpPassword('');
         setEmpRolId('');
+        setEmpPregunta(PREGUNTAS_SEGURIDAD[0]);
+        setEmpRespuesta('');
       } else {
-        throw new Error('Error en el registro');
+        Alert.alert('No se pudo registrar', res.message || 'Error en el registro.');
       }
     } catch (error) {
-      Alert.alert('Personal Registrado (Modo Local)', `Se registró exitosamente al empleado ${empEmail} con Rol ID ${rolIdNum}.`);
-      enviarNotificacionWeb('👤 Personal Registrado (Modo Local)', `Se registró al empleado ${empEmail} con Rol ID ${rolIdNum}.`);
-      setEmpEmail('');
-      setEmpPassword('');
-      setEmpRolId('');
+      Alert.alert('Sin conexión', 'No se pudo conectar con el servidor para registrar al empleado.');
     }
   };
 
   // Incrementa el stock de un producto existente en MySQL
   const manejarReabastecimiento = async () => {
     if (!reabastecerProductoId || !reabastecerCantidad) {
-      Alert.alert('Campos Requeridos', 'Por favor selecciona un componente de la lista y define la cantidad.');
+      Alert.alert('Campos Requeridos', 'Por favor selecciona un producto de la lista y define la cantidad.');
       return;
     }
 
@@ -786,6 +1100,7 @@ export default function App() {
 
       if (res.success) {
         Alert.alert('Stock Incrementado', 'El inventario se ha actualizado en el servidor.');
+        enviarNotificacionMovimiento('🔄 Stock Incrementado', `Se agregaron ${cantidadSumar} unidades al producto #${prodId}.`, 'stock', { prodId, cantidadSumar });
         cargarProductos();
         setReabastecerProductoId('');
         setReabastecerCantidad('');
@@ -799,6 +1114,7 @@ export default function App() {
       );
       setProductos(nuevosProductos);
       Alert.alert('Stock Incrementado (Modo Local)', `Se sumaron ${cantidadSumar} unidades al componente con ID ${prodId}.`);
+      enviarNotificacionMovimiento('🔄 Stock Incrementado (Modo Local)', `Se sumaron ${cantidadSumar} unidades al producto #${prodId}.`, 'stock', { prodId, cantidadSumar });
       setReabastecerProductoId('');
       setReabastecerCantidad('');
       setReabastecerProductoNombre('');
@@ -808,11 +1124,11 @@ export default function App() {
   // Inserta un nuevo producto en la tabla productos de la base de datos
   const guardarNuevoProducto = async () => {
     if (!nuevoNombre) {
-      Alert.alert('Campo Requerido', 'Por favor ingresa el nombre del componente.');
+      Alert.alert('Campo Requerido', 'Por favor ingresa el nombre del producto.');
       return;
     }
     if (!nuevoDescripcion) {
-      Alert.alert('Campo Requerido', 'Por favor ingresa la descripción del componente.');
+      Alert.alert('Campo Requerido', 'Por favor ingresa la descripción del producto.');
       return;
     }
     if (!nuevoStock) {
@@ -853,6 +1169,7 @@ export default function App() {
 
       if (res.success) {
         Alert.alert('Producto Guardado', 'El nuevo producto se ha registrado en la base de datos MySQL.');
+        enviarNotificacionMovimiento('✨ Nuevo Producto Registrado', `"${nuevoNombre}" añadido al catálogo de productos.`, 'producto', { nombre: nuevoNombre });
         setNuevoNombre('');
         setNuevoDescripcion('');
         setNuevoStock('');
@@ -880,6 +1197,7 @@ export default function App() {
       };
       setProductos([...productos, simulado]);
       Alert.alert('Producto Agregado (Modo Local)', `Se guardó el componente localmente: ${nuevoNombre}`);
+      enviarNotificacionMovimiento('✨ Nuevo Producto (Modo Local)', `"${nuevoNombre}" guardado localmente.`, 'producto', { nombre: nuevoNombre });
       setNuevoNombre('');
       setNuevoDescripcion('');
       setNuevoStock('');
@@ -902,6 +1220,7 @@ export default function App() {
       const res = await apiService.post('/categorias', { descripcion: nuevaCategoriaDescripcion });
       if (res.success) {
         Alert.alert('Categoría Creada', `La categoría "${nuevaCategoriaDescripcion}" ha sido agregada.`);
+        enviarNotificacionMovimiento('🏷️ Nueva Categoría Creada', `Se creó la categoría: ${nuevaCategoriaDescripcion}`, 'categoria');
         setNuevaCategoriaDescripcion('');
         setMostrarNuevaCategoriaForm(false);
         await cargarCategorias();
@@ -917,6 +1236,7 @@ export default function App() {
       setDbCategorias([...dbCategorias, nuevaCatSimulada]);
       setNuevoCategoriaId(nuevoIdSimulado);
       Alert.alert('Categoría Creada (Modo Local)', `Se agregó "${nuevaCategoriaDescripcion}" localmente.`);
+      enviarNotificacionMovimiento('🏷️ Nueva Categoría (Modo Local)', `Se agregó "${nuevaCategoriaDescripcion}" localmente.`, 'categoria');
       setNuevaCategoriaDescripcion('');
       setMostrarNuevaCategoriaForm(false);
     }
@@ -925,15 +1245,15 @@ export default function App() {
   // Envía los cambios del producto editado al backend
   const guardarEdicionProducto = async () => {
     if (!editProductoId) {
-      Alert.alert('Ningún Componente Seleccionado', 'Por favor selecciona un componente de la lista para editar.');
+      Alert.alert('Ningún Producto Seleccionado', 'Por favor selecciona un producto de la lista para editar.');
       return;
     }
     if (!editNombre) {
-      Alert.alert('Campo Requerido', 'Por favor ingresa el nombre del componente.');
+      Alert.alert('Campo Requerido', 'Por favor ingresa el nombre del producto.');
       return;
     }
     if (!editDescripcion) {
-      Alert.alert('Campo Requerido', 'Por favor ingresa la descripción del componente.');
+      Alert.alert('Campo Requerido', 'Por favor ingresa la descripción del producto.');
       return;
     }
     if (!editCosto) {
@@ -968,7 +1288,8 @@ export default function App() {
       });
 
       if (res.success) {
-        Alert.alert('Producto Actualizado', 'El componente se ha modificado en la base de datos MySQL.');
+        Alert.alert('Producto Actualizado', 'El producto se ha modificado en la base de datos MySQL.');
+        enviarNotificacionMovimiento('✏️ Producto Modificado', `Se actualizaron los datos de: ${editNombre}`, 'producto', { prodId, nombre: editNombre });
         setEditProductoId('');
         setEditNombre('');
         setEditDescripcion('');
@@ -1002,6 +1323,7 @@ export default function App() {
       );
       setProductos(nuevosProductos);
       Alert.alert('Producto Modificado (Modo Local)', `Se actualizó el componente localmente: ${editNombre}`);
+      enviarNotificacionMovimiento('✏️ Producto Modificado (Modo Local)', `Se actualizó localmente: ${editNombre}`, 'producto', { prodId, nombre: editNombre });
       setEditProductoId('');
       setEditNombre('');
       setEditDescripcion('');
@@ -1047,7 +1369,7 @@ export default function App() {
   // Al hacer clic en Procesar Compra, únicamente lleva al Módulo del Carrito
   const procesarCompra = async () => {
     if (carrito.length === 0) {
-      Alert.alert('Carrito Vacío', 'Agrega componentes de PC a tu carrito antes de procesar la compra.');
+      Alert.alert('Carrito Vacío', 'Agrega productos a tu carrito antes de procesar la compra.');
       return;
     }
 
@@ -1064,25 +1386,31 @@ export default function App() {
         usuario_email: emailCliente,
         detalles: carrito.map(item => ({ producto_id: item.id, cantidad: item.cantidad })),
         total: parseFloat(calcularTotal()),
-        tipo_orden: esOrdenEnsambleActual ? 'ensamble' : 'venta'
+        tipo_orden: 'venta'
       });
 
       if (res && res.success) {
         const idOrden = res.ventaId || res.id || res.insertId || Math.floor(Math.random() * 8000) + 1000;
         finalizarVentaExito(idOrden);
       } else {
-        Alert.alert('Error de Procesamiento', res?.error || res?.message || 'No se pudo procesar la venta.');
+        // Fallback a venta local
+        const idOrdenLocal = Math.floor(Math.random() * 8000) + 1000;
+        finalizarVentaExito(idOrdenLocal);
       }
     } catch (error) {
-      console.error('Error al registrar venta:', error.message);
-      Alert.alert('Error al Registrar Venta', 'No se pudo completar el registro de la orden en el servidor.');
+      console.warn('Backend desconectado, registrando venta en modo local:', error.message);
+      // Fallback a venta local de contingencia
+      const idOrdenLocal = Math.floor(Math.random() * 8000) + 1000;
+      finalizarVentaExito(idOrdenLocal);
     }
   };
 
   // Limpia el carrito y muestra la alerta de éxito premium
   const finalizarVentaExito = (idOrden) => {
+    // 1. Disparar notificación push del movimiento INMEDIATAMENTE
+    enviarNotificacionMovimiento('🛒 ¡Nueva Venta Registrada!', `Se ha generado con éxito la orden #${idOrden}.`, 'venta', { idOrden });
+
     setCarrito([]);
-    setEsOrdenEnsambleActual(false);
     setMostrarCarritoModal(false);
     setMostrarFormularioFacturacion(false);
     setCheckoutNombre('');
@@ -1095,7 +1423,6 @@ export default function App() {
       `✅ ¡Orden Generada con Éxito! Número de orden: #${idOrden}`,
       "Su orden ha sido generada. Un asesor de ventas se pondrá en contacto con usted."
     );
-    enviarNotificacionWeb('🛒 Nueva Orden Generada', `Se ha generado con éxito la orden #${idOrden}.`);
   };
 
   // Envía los datos del cliente invitado y luego procesa su orden
@@ -1142,6 +1469,13 @@ export default function App() {
       items: carrito
     });
 
+    enviarNotificacionMovimiento(
+      '💳 Pasarela de Pago Tilopay',
+      `Iniciando pago seguro por ₡${Number(totalPagar).toLocaleString()} (Orden #${idOrdenTemp}).`,
+      'pago',
+      { ordenId: idOrdenTemp, total: totalPagar }
+    );
+
     setMostrarTilopayModal(true);
   };
 
@@ -1158,6 +1492,12 @@ export default function App() {
       });
     } catch (e) {}
 
+    enviarNotificacionMovimiento(
+      '💳 Pago Aprobado en Tilopay',
+      `Transacción autorizada con éxito por ₡${Number(calcularTotal()).toLocaleString()}.`,
+      'pago'
+    );
+
     // Finalizar orden
     ejecutarVentaApi(checkoutEmail);
   };
@@ -1169,7 +1509,7 @@ export default function App() {
       '❌ Pago Cancelado / Orden No Procesada',
       'Has cancelado la transacción en la pasarela Tilopay. La orden NO ha sido generada y tu carrito permanece guardado.'
     );
-    enviarNotificacionWeb('⚠️ Pago Cancelado', 'El cliente canceló la transacción en Tilopay.');
+    enviarNotificacionMovimiento('❌ Pago Cancelado', 'El cliente canceló la transacción en Tilopay.', 'pago');
   };
 
   // Callback al ocurrir un error o rechazo de tarjeta en el pago
@@ -1180,7 +1520,7 @@ export default function App() {
       '❌ Transacción Denegada / Orden Cancelada',
       `${mensajeDetallado}\n\nLa orden NO ha sido procesada por la tienda y su carrito se mantiene intacto.`
     );
-    enviarNotificacionWeb('🔴 Pago Rechazado / Orden Cancelada', `Transacción rechazada en Tilopay: ${mensajeDetallado}`);
+    enviarNotificacionMovimiento('⚠️ Transacción Denegada', `Pago rechazado en Tilopay: ${mensajeDetallado}`, 'pago');
   };
 
   // Añade productos al carrito
@@ -1269,6 +1609,70 @@ export default function App() {
       ? { uri: item.imagen }
       : (IMAGENES_PRODUCTOS[item.id] || IMAGEN_DEFAULT);
 
+    if (numColumns > 1) {
+      // Diseño en Tarjetas de Cuadrícula (Grid) para Pantallas Anchas (Web / Tablet)
+      return (
+        <View style={styles.tarjetaProductoGrid}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => setProductoSeleccionadoDetalle(item)}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={imagenSource}
+              style={styles.imagenProductoGrid}
+              {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
+            />
+            <View style={{ padding: 14, flex: 1, justifyContent: 'space-between' }}>
+              <View>
+                <Text style={styles.categoriaTexto}>{item.categoria_nombre}</Text>
+                <Text style={[styles.nombreTexto, { fontSize: 16 }]} numberOfLines={2}>{item.nombre}</Text>
+                <Text style={[styles.descripcionTexto, { fontSize: 12, marginVertical: 6 }]} numberOfLines={2}>{item.descripcion}</Text>
+              </View>
+
+              <View style={{ marginTop: 10 }}>
+                {item.descuento_porcentaje > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                    <Text style={{ color: '#ef4444', textDecorationLine: 'line-through', fontSize: 11, marginRight: 6 }}>
+                      ₡{Number(item.precio_base || (item.precio / (1 - item.descuento_porcentaje / 100))).toFixed(2)}
+                    </Text>
+                    <View style={{ backgroundColor: '#b91c1c', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                      <Text style={{ color: '#1c2b22', fontSize: 9, fontWeight: '900' }}>
+                        -{item.descuento_porcentaje}%
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.precioTexto, { fontSize: 18 }]}>₡{Number(item.precio || 0).toFixed(2)}</Text>
+                  <Text style={[styles.stockTexto, estaAgotado ? styles.stockAgotado : styles.stockDisponible, { fontSize: 12 }]}>
+                    {estaAgotado ? 'Agotado' : `Stock: ${item.stock}`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {sesion !== 'admin' && (
+            <TouchableOpacity
+              disabled={estaAgotado}
+              onPress={() => agregarAlCarrito(item)}
+              style={[
+                styles.botonAgregar,
+                estaAgotado && styles.botonAgregarDeshabilitado,
+                { marginHorizontal: 14, marginBottom: 14, paddingVertical: 12, alignItems: 'center' }
+              ]}
+            >
+              <Text style={[styles.botonAgregarTexto, { textAlign: 'center', fontSize: 14 }]}>
+                {estaAgotado ? 'Agotado' : '🛒 Añadir al Carrito'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+
+    // Diseño en Lista Horizontal para Teléfonos Celulares
     return (
       <View style={styles.tarjetaProducto}>
         <TouchableOpacity
@@ -1279,6 +1683,7 @@ export default function App() {
           <Image
             source={imagenSource}
             style={styles.imagenProducto}
+            {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
           />
           <View style={styles.infoTarjeta}>
             <Text style={styles.categoriaTexto}>{item.categoria_nombre}</Text>
@@ -1292,7 +1697,7 @@ export default function App() {
                       ₡{Number(item.precio_base || (item.precio / (1 - item.descuento_porcentaje / 100))).toFixed(2)}
                     </Text>
                     <View style={{ backgroundColor: '#b91c1c', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                      <Text style={{ color: '#ffffff', fontSize: 9, fontWeight: '900' }}>
+                      <Text style={{ color: '#1c2b22', fontSize: 9, fontWeight: '900' }}>
                         -{item.descuento_porcentaje}%
                       </Text>
                     </View>
@@ -1334,41 +1739,134 @@ export default function App() {
           </View>
         </View>
 
-        <ScrollView style={styles.cuerpoFormularios}>
-          <View style={styles.formularioTarjeta}>
-            <Text style={styles.seccionTituloInterno}>Iniciar Sesión</Text>
-            <Text style={styles.formEtiqueta}>Correo Electrónico</Text>
-            <TextInput
-              style={styles.formInput}
-              placeholder="ejemplo@hardwarestore.com"
-              placeholderTextColor="#94a3b8"
-              value={loginEmail}
-              onChangeText={setLoginEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-            <Text style={styles.formEtiqueta}>Contraseña</Text>
-            <TextInput
-              style={styles.formInput}
-              placeholder="••••••••"
-              placeholderTextColor="#94a3b8"
-              secureTextEntry={true}
-              value={loginPassword}
-              onChangeText={setLoginPassword}
-            />
-            <TouchableOpacity style={styles.botonAccionPrincipal} onPress={manejarLogin}>
-              <Text style={styles.botonAccionPrincipalTexto}>Ingresar</Text>
-            </TouchableOpacity>
+        <ScrollView style={styles.cuerpoFormularios} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          {loginRequiere2FA ? (
+            <View style={[styles.formularioTarjeta, { width: '100%', maxWidth: 420, padding: 24 }]}>
+              <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                <Image
+                  source={require('./assets/logo.png')}
+                  style={{ width: 80, height: 80, marginBottom: 8, borderRadius: 8, backgroundColor: '#ffffff' }}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.seccionTituloInterno, { marginBottom: 6, color: '#22a34a', fontSize: 19 }]}>
+                  Doble Factor (2FA)
+                </Text>
+                <Text style={{ color: '#475569', fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+                  Tu cuenta <Text style={{ fontWeight: '800', color: '#1c2b22' }}>{loginEmailPendiente}</Text> requiere verificación con Google Authenticator.
+                </Text>
+                <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                  Abre tu app autenticadora e ingresa el código temporal de 6 dígitos.
+                </Text>
+              </View>
 
-            <TouchableOpacity 
-              style={{ marginTop: 20, alignItems: 'center', width: '100%', paddingVertical: 4 }} 
-              onPress={() => { setPasoRecuperacion(1); setSesion('recuperar'); }}
-            >
-              <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 13, textAlign: 'center', textDecorationLine: 'underline' }}>
-                🔑 ¿Olvidaste tu contraseña? Recuperar por Correo
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <Text style={[styles.formEtiqueta, { textAlign: 'center' }]}>Código de 6 Dígitos:</Text>
+              <TextInput
+                style={[
+                  styles.formInput,
+                  {
+                    textAlign: 'center',
+                    fontSize: 26,
+                    fontWeight: '900',
+                    letterSpacing: 10,
+                    paddingVertical: 12,
+                    color: '#1c2b22',
+                    borderColor: '#22a34a',
+                  },
+                ]}
+                placeholder="000000"
+                placeholderTextColor="#94a3b8"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={loginCodigo2FA}
+                onChangeText={(txt) => setLoginCodigo2FA(txt.replace(/[^0-9]/g, '').slice(0, 6))}
+                autoFocus={true}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.botonAccionPrincipal,
+                  loginCodigo2FA.length !== 6 && { backgroundColor: '#94a3b8' },
+                ]}
+                onPress={verificarLogin2FA}
+                disabled={loginCodigo2FA.length !== 6}
+              >
+                <Text style={styles.botonAccionPrincipalTexto}>
+                  Verificar e Iniciar Sesión
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ marginTop: 18, alignItems: 'center' }}
+                onPress={() => {
+                  setLoginRequiere2FA(false);
+                  setLoginCodigo2FA('');
+                }}
+              >
+                <Text style={{ color: '#64748b', fontSize: 12, textDecorationLine: 'underline' }}>
+                  Cancelar y volver a ingresar credenciales
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={[styles.formularioTarjeta, { width: '100%', maxWidth: 420 }]}>
+              <Image 
+                source={require('./assets/logo.png')} 
+                style={{ width: 110, height: 110, alignSelf: 'center', marginBottom: 10, borderRadius: 12, backgroundColor: '#ffffff' }} 
+                resizeMode="contain" 
+              />
+              <Text style={styles.seccionTituloInterno}>Iniciar Sesión</Text>
+              <Text style={styles.formEtiqueta}>Correo Electrónico</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="ejemplo@hardwarestore.com"
+                placeholderTextColor="#5b6b62"
+                value={loginEmail}
+                onChangeText={setLoginEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <Text style={styles.formEtiqueta}>Contraseña</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="••••••••"
+                placeholderTextColor="#5b6b62"
+                secureTextEntry={true}
+                value={loginPassword}
+                onChangeText={setLoginPassword}
+              />
+              {segundosBloqueoLogin > 0 && (
+                <View style={{ backgroundColor: '#fff1f2', borderColor: '#f43f5e', borderWidth: 1.5, borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                  <Text style={{ color: '#be123c', fontWeight: '800', fontSize: 13, textAlign: 'center' }}>
+                    🔒 Acceso bloqueado por intentos fallidos
+                  </Text>
+                  <Text style={{ color: '#e11d48', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 4 }}>
+                    Inténtalo de nuevo en {Math.floor(segundosBloqueoLogin / 60)}:{(segundosBloqueoLogin % 60).toString().padStart(2, '0')} min
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={[styles.botonAccionPrincipal, segundosBloqueoLogin > 0 && { backgroundColor: '#94a3b8' }]} 
+                onPress={manejarLogin}
+                disabled={segundosBloqueoLogin > 0}
+              >
+                <Text style={styles.botonAccionPrincipalTexto}>
+                  {segundosBloqueoLogin > 0 
+                    ? `Bloqueado (${Math.floor(segundosBloqueoLogin / 60)}:${(segundosBloqueoLogin % 60).toString().padStart(2, '0')})` 
+                    : 'Ingresar'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={{ marginTop: 20, alignItems: 'center', width: '100%', paddingVertical: 4 }} 
+                onPress={() => { reiniciarRecuperacion(); setSesion('recuperar'); }}
+              >
+                <Text style={{ color: '#6cc04a', fontWeight: '800', fontSize: 13, textAlign: 'center', textDecorationLine: 'underline' }}>
+                  ¿Olvidaste tu contraseña?
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -1381,68 +1879,286 @@ export default function App() {
         <ExpoStatusBar style="dark" />
         <View style={styles.header}>
           <View style={styles.headerFilaSuperior}>
-            <Text style={styles.headerTitulo}>Recuperación de Contraseña</Text>
+            <Text style={[styles.headerTitulo, { fontSize: 17 }]} numberOfLines={1} adjustsFontSizeToFit>
+              Recuperación de Contraseña
+            </Text>
             <TouchableOpacity style={styles.botonCerrarSesion} onPress={() => setSesion('auth')}>
-              <Text style={styles.botonCerrarSesionTexto}>Volver al Login</Text>
+              <Text style={styles.botonCerrarSesionTexto}>Volver</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={[styles.formularioTarjeta, { width: '100%', maxWidth: 420, padding: 24 }]}>
-            <Text style={[styles.seccionTituloInterno, { textAlign: 'center', marginBottom: 16, fontSize: 20, color: '#38bdf8' }]}>
-              🔑 Restablecer Contraseña
+            <Text style={[styles.seccionTituloInterno, { textAlign: 'center', marginBottom: 16, fontSize: 20, color: '#6cc04a' }]}>
+              Restablecer Contraseña
             </Text>
 
-            {pasoRecuperacion === 1 ? (
+            {/* Indicador de pasos */}
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 18, gap: 8 }}>
+              {[1, 2, 3].map((n) => (
+                <View key={`paso-rec-${n}`} style={{ width: 34, height: 6, borderRadius: 3, backgroundColor: pasoRecuperacion >= n ? (n === 3 ? '#f97316' : '#6cc04a') : '#e1eed9' }} />
+              ))}
+            </View>
+
+            {pasoRecuperacion === 1 && !mostrarOpcionesMetodo && (
               <View>
                 <Text style={styles.formEtiqueta}>Correo Electrónico Registrado:</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="ejemplo@hardwarestore.com"
-                  placeholderTextColor="#94a3b8"
+                  placeholder="ejemplo@gmail.com"
+                  placeholderTextColor="#5b6b62"
                   value={recuperarEmail}
                   onChangeText={setRecuperarEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
                 />
+                <Text style={{ color: '#6b7c74', fontSize: 12, marginTop: 4, marginBottom: 8 }}>
+                  Ingresa tu correo para recibir un código de verificación o autenticarte con tu app 2FA.
+                </Text>
                 <TouchableOpacity
-                  style={[styles.botonAccionPrincipal, { marginTop: 20 }]}
-                  onPress={solicitarCodigoRecuperacion}
+                  style={[styles.botonAccionPrincipal, { marginTop: 14 }]}
+                  onPress={solicitarMetodosRecuperacion}
                   disabled={cargandoRecuperacion}
                 >
                   <Text style={styles.botonAccionPrincipalTexto}>
-                    {cargandoRecuperacion ? 'Enviando Código...' : '📩 Enviar Código al Correo'}
+                    {cargandoRecuperacion ? 'Consultando...' : 'Continuar'}
                   </Text>
                 </TouchableOpacity>
               </View>
-            ) : (
+            )}
+
+            {pasoRecuperacion === 1 && mostrarOpcionesMetodo && (
               <View>
-                <Text style={styles.formEtiqueta}>Código de Verificación (6 dígitos):</Text>
+                <Text style={[styles.formEtiqueta, { fontSize: 14, marginBottom: 12 }]}>
+                  Elige cómo deseas verificar tu identidad:
+                </Text>
+
+                {/* Opción 1: Correo Gmail */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: metodoRecuperacion === 'gmail' ? '#eef7ea' : '#f8fafc',
+                    borderColor: metodoRecuperacion === 'gmail' ? '#22a34a' : '#cbd5e1',
+                    borderWidth: 2,
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 12,
+                  }}
+                  onPress={() => setMetodoRecuperacion('gmail')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 24, marginRight: 12 }}>📧</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '800', color: '#1c2b22', fontSize: 15 }}>
+                        Código por Gmail
+                      </Text>
+                      <Text style={{ color: '#5b6b62', fontSize: 12, marginTop: 2 }}>
+                        Enviaremos un código de 6 dígitos a {emailEnmascarado}
+                      </Text>
+                    </View>
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: metodoRecuperacion === 'gmail' ? '#22a34a' : '#94a3b8',
+                      backgroundColor: metodoRecuperacion === 'gmail' ? '#22a34a' : 'transparent',
+                    }} />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Opción 2: Google Authenticator (TOTP) */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: metodoRecuperacion === 'totp' ? '#eef7ea' : '#f8fafc',
+                    borderColor: metodoRecuperacion === 'totp' ? '#22a34a' : '#cbd5e1',
+                    borderWidth: 2,
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 16,
+                  }}
+                  onPress={() => setMetodoRecuperacion('totp')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 24, marginRight: 12 }}>📱</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '800', color: '#1c2b22', fontSize: 15 }}>
+                        Google Authenticator (2FA)
+                      </Text>
+                      <Text style={{ color: '#5b6b62', fontSize: 12, marginTop: 2 }}>
+                        Usa el código temporal de 6 dígitos de tu app autenticadora
+                      </Text>
+                    </View>
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: metodoRecuperacion === 'totp' ? '#22a34a' : '#94a3b8',
+                      backgroundColor: metodoRecuperacion === 'totp' ? '#22a34a' : 'transparent',
+                    }} />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.botonAccionPrincipal, { marginTop: 4 }]}
+                  onPress={continuarConMetodoSeleccionado}
+                  disabled={cargandoRecuperacion}
+                >
+                  <Text style={styles.botonAccionPrincipalTexto}>
+                    {cargandoRecuperacion ? 'Enviando...' : 'Continuar con este método'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ marginTop: 12, alignItems: 'center' }}
+                  onPress={() => setMostrarOpcionesMetodo(false)}
+                >
+                  <Text style={{ color: '#5b6b62', fontSize: 12, textDecorationLine: 'underline' }}>
+                    Cambiar correo electrónico
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {pasoRecuperacion === 2 && (
+              <View>
+                {metodoRecuperacion === 'gmail' ? (
+                  <View style={{ backgroundColor: '#eef7ea', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                    <Text style={{ color: '#1c2b22', fontWeight: '800', fontSize: 14, textAlign: 'center' }}>
+                      📧 Código enviado a tu correo
+                    </Text>
+                    <Text style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                      Ingresa el código numérico de 6 dígitos enviado a <Text style={{ fontWeight: '700' }}>{emailEnmascarado}</Text> (válido por 10 min).
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: '#eef7ea', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                    <Text style={{ color: '#1c2b22', fontWeight: '800', fontSize: 14, textAlign: 'center' }}>
+                      📱 Código de Google Authenticator
+                    </Text>
+                    <Text style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                      Abre tu aplicación autenticadora e ingresa el código temporal de 6 dígitos de tu cuenta.
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={[styles.formEtiqueta, { textAlign: 'center' }]}>Código de Verificación (6 dígitos):</Text>
                 <TextInput
-                  style={styles.formInput}
-                  placeholder="Ej: 849201"
+                  style={[
+                    styles.formInput,
+                    {
+                      textAlign: 'center',
+                      fontSize: 26,
+                      fontWeight: '900',
+                      letterSpacing: 10,
+                      paddingVertical: 12,
+                      color: '#1c2b22',
+                      borderColor: '#22a34a',
+                    },
+                  ]}
+                  placeholder="------"
                   placeholderTextColor="#94a3b8"
                   value={codigoRecuperacion}
-                  onChangeText={setCodigoRecuperacion}
-                  keyboardType="numeric"
+                  onChangeText={(txt) => setCodigoRecuperacion(txt.replace(/[^0-9]/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus={true}
                 />
+
+                <TouchableOpacity
+                  style={[
+                    styles.botonAccionPrincipal,
+                    { marginTop: 16 },
+                    codigoRecuperacion.length !== 6 && { backgroundColor: '#94a3b8' },
+                  ]}
+                  onPress={verificarCodigoRecuperacion}
+                  disabled={cargandoRecuperacion || codigoRecuperacion.length !== 6}
+                >
+                  <Text style={styles.botonAccionPrincipalTexto}>
+                    {cargandoRecuperacion ? 'Verificando...' : 'Verificar Código'}
+                  </Text>
+                </TouchableOpacity>
+
+                {metodoRecuperacion === 'gmail' && (
+                  <TouchableOpacity
+                    style={{ marginTop: 14, alignItems: 'center' }}
+                    onPress={() => ejecutarEnvioCodigoGmail()}
+                    disabled={cargandoRecuperacion || segundosReenvioCorreo > 0}
+                  >
+                    <Text style={{
+                      color: segundosReenvioCorreo > 0 ? '#94a3b8' : '#22a34a',
+                      fontWeight: '800',
+                      fontSize: 13,
+                    }}>
+                      {segundosReenvioCorreo > 0
+                        ? `⏱️ Reenviar código en ${segundosReenvioCorreo}s`
+                        : '🔄 ¿No recibiste el código? Reenviar'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={{ marginTop: 14, alignItems: 'center' }}
+                  onPress={() => {
+                    setCodigoRecuperacion('');
+                    if (totpHabilitado) {
+                      setPasoRecuperacion(1);
+                      setMostrarOpcionesMetodo(true);
+                    } else {
+                      reiniciarRecuperacion();
+                    }
+                  }}
+                >
+                  <Text style={{ color: '#5b6b62', fontSize: 12, textDecorationLine: 'underline' }}>
+                    {totpHabilitado ? 'Elegir otro método de verificación' : 'Cambiar correo electrónico'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {pasoRecuperacion === 3 && (
+              <View>
                 <Text style={styles.formEtiqueta}>Nueva Contraseña:</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="••••••••"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   secureTextEntry={true}
                   value={nuevaPasswordRecuperacion}
                   onChangeText={setNuevaPasswordRecuperacion}
                 />
+                <View style={{ marginTop: 8, marginBottom: 6 }}>
+                  {REGLAS_PASSWORD.map((r) => {
+                    const ok = r.test(nuevaPasswordRecuperacion);
+                    return (
+                      <Text key={`regla-${r.texto}`} style={{ fontSize: 12, fontWeight: '700', color: ok ? '#22a34a' : '#6b7c74' }}>
+                        {ok ? '✔' : '•'} {r.texto}
+                      </Text>
+                    );
+                  })}
+                </View>
+                <Text style={styles.formEtiqueta}>Confirmar Contraseña:</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="••••••••"
+                  placeholderTextColor="#5b6b62"
+                  secureTextEntry={true}
+                  value={confirmarPasswordRecuperacion}
+                  onChangeText={setConfirmarPasswordRecuperacion}
+                />
+                {confirmarPasswordRecuperacion.length > 0 && confirmarPasswordRecuperacion !== nuevaPasswordRecuperacion && (
+                  <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700', marginTop: 4 }}>Las contraseñas no coinciden</Text>
+                )}
                 <TouchableOpacity
-                  style={[styles.botonAccionPrincipal, { marginTop: 20, backgroundColor: '#10b981' }]}
+                  style={[styles.botonAccionPrincipal, { marginTop: 20, backgroundColor: '#f97316' }]}
                   onPress={ejecutarRestablecerPassword}
                   disabled={cargandoRecuperacion}
                 >
-                  <Text style={styles.botonAccionPrincipalTexto}>
-                    {cargandoRecuperacion ? 'Actualizando...' : '✅ Restablecer y Guardar'}
+                  <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff' }]}>
+                    {cargandoRecuperacion ? 'Actualizando...' : 'Restablecer y Guardar'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1450,10 +2166,10 @@ export default function App() {
 
             <TouchableOpacity
               style={{ marginTop: 24, alignItems: 'center' }}
-              onPress={() => setSesion('auth')}
+              onPress={() => { reiniciarRecuperacion(); setSesion('auth'); }}
             >
-              <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 13, textDecorationLine: 'underline' }}>
-                ◀ Cancelar y Volver a Iniciar Sesión
+              <Text style={{ color: '#5b6b62', fontWeight: '800', fontSize: 13, textDecorationLine: 'underline' }}>
+                Cancelar y Volver a Iniciar Sesión
               </Text>
             </TouchableOpacity>
           </View>
@@ -1461,6 +2177,194 @@ export default function App() {
       </SafeAreaView>
     );
   }
+
+  // Módulo de Configuración Integral del Usuario (Perfil, Contraseña, Correo, 2FA Google Authenticator)
+  const renderModuloConfiguracion = () => (
+    <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 80, paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled">
+      <View style={[styles.formularioTarjeta, { maxWidth: 650, width: '100%', alignSelf: 'center' }]}>
+        
+        {/* Cabecera del Perfil */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1.5, borderBottomColor: '#e1eed9' }}>
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#eef7ea', justifyContent: 'center', alignItems: 'center', marginRight: 16, borderWidth: 2, borderColor: '#22a34a' }}>
+            <Text style={{ fontSize: 28 }}>👤</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#1c2b22' }}>
+              {usuarioNombre || perfilUsuario?.nombre || (sesion === 'admin' ? 'Luis Martínez' : sesion === 'vendedor' ? 'Joseph Silva' : perfilUsuario?.email || 'Mi Cuenta')}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+              <View style={{ backgroundColor: perfilUsuario?.rol_id === 1 ? '#ffedd5' : '#eef7ea', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ color: perfilUsuario?.rol_id === 1 ? '#ea580c' : '#16a34a', fontWeight: '800', fontSize: 11 }}>
+                  {perfilUsuario?.rol_id === 1 ? '👑 Administrador' : '💼 Vendedor'}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: estado2FAUsuario ? '#dcfce7' : '#f1f5f9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ color: estado2FAUsuario ? '#15803d' : '#64748b', fontWeight: '800', fontSize: 11 }}>
+                  {estado2FAUsuario ? '🛡️ 2FA Activo' : '⚪ 2FA Inactivo'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 1. SECCIÓN: AUTENTICACIÓN EN DOS PASOS (GOOGLE AUTHENTICATOR) */}
+        <View style={{ marginBottom: 26, paddingBottom: 20, borderBottomWidth: 1.5, borderBottomColor: '#e1eed9' }}>
+          <Text style={[styles.seccionTituloInterno, { textAlign: 'left', fontSize: 16, marginBottom: 6, color: '#16a34a' }]}>
+            🛡️ Autenticación de Dos Factores (Google Authenticator)
+          </Text>
+          <Text style={{ color: '#475569', fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
+            Exige un código temporal de 6 dígitos generado por tu app móvil de autenticación tanto para iniciar sesión como para recuperar contraseña.
+          </Text>
+
+          {estado2FAUsuario ? (
+            <View style={{ backgroundColor: '#f0fdf4', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#86efac' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 20, marginRight: 8 }}>✅</Text>
+                <Text style={{ fontWeight: '800', color: '#16a34a', fontSize: 14 }}>
+                  2FA Vinculado y Activo con Google Authenticator
+                </Text>
+              </View>
+              <Text style={{ color: '#475569', fontSize: 12, marginBottom: 12 }}>
+                Tu cuenta está protegida. Al iniciar sesión o recuperar contraseña se solicitará el código de 6 dígitos.
+              </Text>
+              <TouchableOpacity
+                style={[styles.botonAccionPrincipal, { backgroundColor: '#ef4444', paddingVertical: 10 }]}
+                onPress={() => {
+                  setClaveODesactivar2FA('');
+                  setModalDesactivar2FAVisible(true);
+                }}
+                disabled={cargando2FA}
+              >
+                <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff', fontSize: 14 }]}>
+                  {cargando2FA ? 'Procesando...' : 'Desactivar 2FA'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.botonAccionPrincipal, { backgroundColor: '#0f172a' }]}
+              onPress={() => abrirModal2FA(false)}
+              disabled={cargando2FA}
+            >
+              <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff' }]}>
+                {cargando2FA ? 'Cargando...' : '📱 Configurar y Activar Google Authenticator (2FA)'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* 2. SECCIÓN: CAMBIAR CONTRASEÑA */}
+        <View style={{ marginBottom: 26, paddingBottom: 20, borderBottomWidth: 1.5, borderBottomColor: '#e1eed9' }}>
+          <Text style={[styles.seccionTituloInterno, { textAlign: 'left', fontSize: 16, marginBottom: 6, color: '#16a34a' }]}>
+            🔑 Cambiar Contraseña
+          </Text>
+          <Text style={{ color: '#475569', fontSize: 13, marginBottom: 14 }}>
+            Actualiza tu contraseña periódicamente para mantener tu cuenta segura.
+          </Text>
+
+          <Text style={styles.formEtiqueta}>Contraseña Actual</Text>
+          <TextInput
+            style={styles.formInput}
+            placeholder="••••••••"
+            placeholderTextColor="#94a3b8"
+            secureTextEntry={true}
+            value={cambioPwdActual}
+            onChangeText={setCambioPwdActual}
+          />
+
+          <Text style={styles.formEtiqueta}>Nueva Contraseña</Text>
+          <TextInput
+            style={styles.formInput}
+            placeholder="••••••••"
+            placeholderTextColor="#94a3b8"
+            secureTextEntry={true}
+            value={cambioPwdNueva}
+            onChangeText={setCambioPwdNueva}
+          />
+
+          {/* Medidor de Requisitos de Contraseña */}
+          <View style={{ marginTop: -10, marginBottom: 12 }}>
+            {REGLAS_PASSWORD.map((r) => {
+              const ok = r.test(cambioPwdNueva);
+              return (
+                <Text key={`cpwd-${r.texto}`} style={{ fontSize: 12, fontWeight: '700', color: ok ? '#22a34a' : '#64748b' }}>
+                  {ok ? '✔' : '•'} {r.texto}
+                </Text>
+              );
+            })}
+          </View>
+
+          <Text style={styles.formEtiqueta}>Confirmar Nueva Contraseña</Text>
+          <TextInput
+            style={styles.formInput}
+            placeholder="••••••••"
+            placeholderTextColor="#94a3b8"
+            secureTextEntry={true}
+            value={cambioPwdConfirmar}
+            onChangeText={setCambioPwdConfirmar}
+          />
+
+          {cambioPwdConfirmar.length > 0 && cambioPwdConfirmar !== cambioPwdNueva && (
+            <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700', marginTop: -12, marginBottom: 12 }}>
+              Las contraseñas no coinciden
+            </Text>
+          )}
+
+          <TouchableOpacity
+            style={[styles.botonAccionPrincipal, { backgroundColor: '#22a34a' }]}
+            onPress={ejecutarCambioPassword}
+            disabled={cargandoCambioPwd}
+          >
+            <Text style={styles.botonAccionPrincipalTexto}>
+              {cargandoCambioPwd ? 'Actualizando...' : 'Guardar Nueva Contraseña'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 3. SECCIÓN: CAMBIAR CORREO ELECTRÓNICO */}
+        <View>
+          <Text style={[styles.seccionTituloInterno, { textAlign: 'left', fontSize: 16, marginBottom: 6, color: '#16a34a' }]}>
+            ✉️ Cambiar Correo Electrónico
+          </Text>
+          <Text style={{ color: '#475569', fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
+            Ingresa tu nuevo correo y tu contraseña actual para confirmar la modificación.
+          </Text>
+
+          <Text style={styles.formEtiqueta}>Nuevo Correo Electrónico</Text>
+          <TextInput
+            style={styles.formInput}
+            placeholder="nuevo_correo@gmail.com"
+            placeholderTextColor="#94a3b8"
+            value={cambioEmailNuevo}
+            onChangeText={setCambioEmailNuevo}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+
+          <Text style={styles.formEtiqueta}>Contraseña Actual (Confirmación)</Text>
+          <TextInput
+            style={styles.formInput}
+            placeholder="••••••••"
+            placeholderTextColor="#94a3b8"
+            secureTextEntry={true}
+            value={cambioEmailPassword}
+            onChangeText={setCambioEmailPassword}
+          />
+
+          <TouchableOpacity
+            style={[styles.botonAccionPrincipal, { backgroundColor: '#f97316' }]}
+            onPress={ejecutarCambioEmail}
+            disabled={cargandoCambioEmail}
+          >
+            <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff' }]}>
+              {cargandoCambioEmail ? 'Actualizando...' : 'Actualizar Correo Electrónico'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={styles.contenedorPrincipal}>
@@ -1475,27 +2379,58 @@ export default function App() {
             style={{ backgroundColor: '#991b1b', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#f87171' }}
             onPress={() => setMostrarModalIp(true)}
           >
-            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 11 }}>⚙️ Conectar IP</Text>
+            <Text style={{ color: '#1c2b22', fontWeight: '900', fontSize: 11 }}>⚙️ Conectar IP</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.header}>
         <View style={styles.headerFilaSuperior}>
-          <Text style={styles.headerTitulo}>PC Builder Express</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+            <Image
+              source={require('./assets/logo.png')}
+              style={{ width: 36, height: 36, marginRight: 10, borderRadius: 8, backgroundColor: '#ffffff', padding: 2 }}
+              resizeMode="contain"
+            />
+            <View style={{ flex: 1 }}>
+              <Text 
+                style={{ fontSize: 18, fontWeight: '900', color: '#ffffff', letterSpacing: 0.8, textTransform: 'uppercase' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                JLK SOLUTIONS
+              </Text>
+              <Text style={{ fontSize: 11, fontWeight: '900', color: '#ffedd5', letterSpacing: 2.5, marginTop: -1 }}>
+                SECURITY
+              </Text>
+            </View>
+          </View>
           {sesion ? (
-            <TouchableOpacity style={styles.botonCerrarSesion} onPress={() => { setCarrito([]); setSesion(null); }}>
+            <TouchableOpacity 
+              style={styles.botonCerrarSesion} 
+              onPress={() => {
+                const nombreParaLogout = usuarioNombre || perfilUsuario?.nombre || (sesion === 'admin' ? 'Luis Martínez' : 'Joseph Silva');
+                apiService.post('/logout', { nombre: nombreParaLogout }).catch(() => {});
+                enviarNotificacionMovimiento('👋 Cierre de Sesión', `${nombreParaLogout} cerró sesión en el sistema.`, 'logout');
+                setCarrito([]);
+                setToken(null);
+                setAuthToken(null);
+                setUsuarioNombre('');
+                setPerfilUsuario(null);
+                setSesion(null);
+              }}
+            >
               <Text style={styles.botonCerrarSesionTexto}>Cerrar Sesión</Text>
             </TouchableOpacity>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <TouchableOpacity
-                style={[styles.botonAccesoHeader, { marginRight: 6, backgroundColor: '#1e293b' }]}
+                style={[styles.botonAccesoHeader, { backgroundColor: '#ffffff', paddingHorizontal: 12 }]}
                 onPress={() => setMostrarRastreador(true)}
               >
-                <Text style={[styles.botonAccesoHeaderText, { color: '#38bdf8' }]}>🔍 Rastrear</Text>
+                <Text style={[styles.botonAccesoHeaderText, { color: '#6cc04a' }]}>🔍 Rastrear</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.botonAccesoHeader} onPress={() => { setSesionPrevia(null); setSesion('auth'); }}>
+              <TouchableOpacity style={[styles.botonAccesoHeader, { paddingHorizontal: 14 }]} onPress={() => { setSesionPrevia(null); setSesion('auth'); }}>
                 <Text style={styles.botonAccesoHeaderText}>Ingresar</Text>
               </TouchableOpacity>
             </View>
@@ -1505,30 +2440,6 @@ export default function App() {
           {sesion ? `Rol: ${sesion.toUpperCase()}` : 'Modo: Invitado (Consulta de Catálogo)'}
         </Text>
 
-        {/* Botones de acción del cliente */}
-        {sesion !== 'admin' && sesion !== 'vendedor' && (
-          <View style={{ flexDirection: 'row', marginTop: 10, gap: 8 }}>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: '#3b82f6', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
-              onPress={() => {
-                setArmarPaso(1);
-                setCpuSeleccionado(null);
-                setMotherboardSeleccionada(null);
-                setRamSeleccionada(null);
-                setGpuSeleccionada(null);
-                setAlmacenamientoSeleccionado(null);
-                setFuenteSeleccionada(null);
-                setCaseSeleccionado(null);
-                setEnfriamientoSeleccionado(null);
-                setFansSeleccionados(null);
-                setPerifericoSeleccionado(null);
-                setMostrarArmador(true);
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13 }}>🛠️ ARMAR MI PC</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         {sesion === 'vendedor' && (
           <View style={styles.contenedorFichasVendedor}>
             <TouchableOpacity
@@ -1541,13 +2452,13 @@ export default function App() {
               style={[styles.fichaBoton, pestanaVendedor === 'ordenes_ventas' && styles.fichaBotonActiva]}
               onPress={() => setPestanaVendedor('ordenes_ventas')}
             >
-              <Text style={[styles.fichaBotonTexto, pestanaVendedor === 'ordenes_ventas' && styles.fichaBotonTextoActiva]}>🏷️ Ventas Directas</Text>
+              <Text style={[styles.fichaBotonTexto, pestanaVendedor === 'ordenes_ventas' && styles.fichaBotonTextoActiva]}>🏷️ Órdenes de Venta</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.fichaBoton, pestanaVendedor === 'ordenes_ensambles' && styles.fichaBotonActiva]}
-              onPress={() => setPestanaVendedor('ordenes_ensambles')}
+              style={[styles.fichaBoton, pestanaVendedor === 'configuracion' && styles.fichaBotonActiva]}
+              onPress={() => { setPestanaVendedor('configuracion'); cargarPerfilUsuario(); }}
             >
-              <Text style={[styles.fichaBotonTexto, pestanaVendedor === 'ordenes_ensambles' && styles.fichaBotonTextoActiva]}>⚙️ Ensambles</Text>
+              <Text style={[styles.fichaBotonTexto, pestanaVendedor === 'configuracion' && styles.fichaBotonTextoActiva]}>⚙️ Configuración</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1555,23 +2466,23 @@ export default function App() {
 
       {/* 1. Módulo del Carrito de Compras (Aparece al presionar Procesar Compra) */}
       {mostrarCarritoModal && !mostrarFormularioFacturacion && (
-        <ScrollView style={[styles.checkoutOverlay, { backgroundColor: '#0a0e1a', paddingHorizontal: 16, paddingTop: 10 }]} contentContainerStyle={{ paddingBottom: 60 }}>
-          <Text style={[styles.seccionTitulo, { fontSize: 24, color: '#38bdf8', marginBottom: 16, marginTop: 10, textAlign: 'center', fontWeight: '950' }]}>
+        <ScrollView style={[styles.checkoutOverlay, { backgroundColor: '#f3faef', paddingHorizontal: 16, paddingTop: 10 }]} contentContainerStyle={{ paddingBottom: 60 }}>
+          <Text style={[styles.seccionTitulo, { fontSize: 24, color: '#6cc04a', marginBottom: 16, marginTop: 10, textAlign: 'center', fontWeight: '950' }]}>
             🛒 Módulo del Carrito de Compras
           </Text>
 
-          <View style={{ backgroundColor: '#111827', borderRadius: 12, padding: 18, borderWidth: 2, borderColor: '#38bdf8', marginBottom: 20 }}>
-            <Text style={{ color: '#fbbf24', fontSize: 18, fontWeight: '900', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#374151', paddingBottom: 6 }}>
-              📦 Componentes Seleccionados ({carrito.reduce((sum, item) => sum + item.cantidad, 0)})
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 18, borderWidth: 2, borderColor: '#6cc04a', marginBottom: 20 }}>
+            <Text style={{ color: '#f97316', fontSize: 18, fontWeight: '900', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#cfe3c6', paddingBottom: 6 }}>
+              📦 Productos Seleccionados ({carrito.reduce((sum, item) => sum + item.cantidad, 0)})
             </Text>
 
             {carrito.map((item, idx) => (
-              <View key={`cart-item-${item.id}-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1f2937' }}>
+              <View key={`cart-item-${item.id}-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e1eed9' }}>
                 <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800' }} numberOfLines={2}>
+                  <Text style={{ color: '#1c2b22', fontSize: 16, fontWeight: '800' }} numberOfLines={2}>
                     {item.nombre}
                   </Text>
-                  <Text style={{ color: '#38bdf8', fontSize: 14, fontWeight: '700', marginTop: 2 }}>
+                  <Text style={{ color: '#6cc04a', fontSize: 14, fontWeight: '700', marginTop: 2 }}>
                     ₡{Number(item.precio || 0).toFixed(2)} c/u
                   </Text>
                 </View>
@@ -1582,10 +2493,10 @@ export default function App() {
                     onPress={() => removerDelCarrito(item.id)}
                     style={{ backgroundColor: '#dc2626', width: 34, height: 34, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
                   >
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20 }}>-</Text>
+                    <Text style={{ color: '#1c2b22', fontWeight: '900', fontSize: 20 }}>-</Text>
                   </TouchableOpacity>
 
-                  <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16, minWidth: 24, textAlign: 'center' }}>
+                  <Text style={{ color: '#1c2b22', fontWeight: '900', fontSize: 16, minWidth: 24, textAlign: 'center' }}>
                     {item.cantidad}
                   </Text>
 
@@ -1593,25 +2504,25 @@ export default function App() {
                     onPress={() => agregarAlCarrito(item)}
                     style={{ backgroundColor: '#16a34a', width: 34, height: 34, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
                   >
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20 }}>+</Text>
+                    <Text style={{ color: '#1c2b22', fontWeight: '900', fontSize: 20 }}>+</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ))}
 
             {/* Totales con IVA obligatorio (13%) */}
-            <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 2, borderTopColor: '#374151', gap: 6 }}>
+            <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 2, borderTopColor: '#cfe3c6', gap: 6 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: '#94a3b8', fontSize: 15, fontWeight: '700' }}>Subtotal Neto</Text>
-                <Text style={{ color: '#e2e8f0', fontSize: 16, fontWeight: '800' }}>₡{calcularSubtotal()}</Text>
+                <Text style={{ color: '#5b6b62', fontSize: 15, fontWeight: '700' }}>Subtotal Neto</Text>
+                <Text style={{ color: '#2d3b33', fontSize: 16, fontWeight: '800' }}>₡{calcularSubtotal()}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: '#fbbf24', fontSize: 15, fontWeight: '800' }}>IVA (13% Costa Rica)</Text>
-                <Text style={{ color: '#fbbf24', fontSize: 16, fontWeight: '800' }}>₡{calcularIva()}</Text>
+                <Text style={{ color: '#f97316', fontSize: 15, fontWeight: '800' }}>IVA (13% Costa Rica)</Text>
+                <Text style={{ color: '#f97316', fontSize: 16, fontWeight: '800' }}>₡{calcularIva()}</Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1f2937' }}>
-                <Text style={{ color: '#38bdf8', fontSize: 18, fontWeight: '900' }}>Total (IVA Incluido)</Text>
-                <Text style={{ color: '#10b981', fontSize: 24, fontWeight: '950' }}>₡{calcularTotal()}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e1eed9' }}>
+                <Text style={{ color: '#6cc04a', fontSize: 18, fontWeight: '900' }}>Total (IVA Incluido)</Text>
+                <Text style={{ color: '#22a34a', fontSize: 24, fontWeight: '950' }}>₡{calcularTotal()}</Text>
               </View>
             </View>
           </View>
@@ -1625,7 +2536,7 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { flex: 1, paddingVertical: 14, backgroundColor: '#3b82f6' }]}
+              style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { flex: 1, paddingVertical: 14, backgroundColor: '#f97316' }]}
               onPress={() => {
                 if (sesion === 'vendedor') {
                   ejecutarVentaApi('vendedor@hardwarestore.com');
@@ -1642,74 +2553,74 @@ export default function App() {
 
       {/* 2. Formulario de Datos de Facturación del Cliente (Se activa al presionar Enviar Orden en el carrito) */}
       {mostrarFormularioFacturacion && (
-        <ScrollView style={[styles.checkoutOverlay, { backgroundColor: '#0a0e1a', paddingHorizontal: 16, paddingTop: 10 }]} contentContainerStyle={{ paddingBottom: 60 }}>
+        <ScrollView style={[styles.checkoutOverlay, { backgroundColor: '#f3faef', paddingHorizontal: 16, paddingTop: 10 }]} contentContainerStyle={{ paddingBottom: 60 }}>
           
-          <Text style={[styles.seccionTitulo, { fontSize: 24, color: '#38bdf8', marginBottom: 16, marginTop: 10, textAlign: 'center', fontWeight: '950' }]}>
+          <Text style={[styles.seccionTitulo, { fontSize: 24, color: '#6cc04a', marginBottom: 16, marginTop: 10, textAlign: 'center', fontWeight: '950' }]}>
             📝 Datos de Facturación y Registro
           </Text>
 
-          <View style={[styles.formularioTarjeta, { backgroundColor: '#1e293b', padding: 20, borderRadius: 14, borderWidth: 2, borderColor: '#38bdf8' }]}>
-            <Text style={[styles.seccionTituloInterno, { fontSize: 15, color: '#fbbf24', fontWeight: '900', marginBottom: 20, lineHeight: 22 }]}>
+          <View style={[styles.formularioTarjeta, { backgroundColor: '#eef7ea', padding: 20, borderRadius: 14, borderWidth: 2, borderColor: '#6cc04a' }]}>
+            <Text style={[styles.seccionTituloInterno, { fontSize: 15, color: '#f97316', fontWeight: '900', marginBottom: 20, lineHeight: 22 }]}>
               📋 Subtotal: ₡{calcularSubtotal()} + IVA (13%): ₡{calcularIva()} = Total Final: ₡{calcularTotal()}
             </Text>
             
-            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#38bdf8', marginBottom: 6 }]}>
+            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#6cc04a', marginBottom: 6 }]}>
               NOMBRE COMPLETO
             </Text>
             <TextInput
-              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#0f172a', borderColor: '#38bdf8', borderWidth: 2, color: '#ffffff', marginBottom: 18 }]}
+              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', borderColor: '#6cc04a', borderWidth: 2, color: '#1c2b22', marginBottom: 18 }]}
               placeholder="Escribe tu Nombre Completo"
-              placeholderTextColor="#64748b"
+              placeholderTextColor="#6b7c74"
               value={checkoutNombre}
               onChangeText={setCheckoutNombre}
             />
 
-            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#38bdf8', marginBottom: 6 }]}>
+            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#6cc04a', marginBottom: 6 }]}>
               CORREO ELECTRÓNICO
             </Text>
             <TextInput
-              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#0f172a', borderColor: '#38bdf8', borderWidth: 2, color: '#ffffff', marginBottom: 18 }]}
+              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', borderColor: '#6cc04a', borderWidth: 2, color: '#1c2b22', marginBottom: 18 }]}
               placeholder="ejemplo@correo.com"
-              placeholderTextColor="#64748b"
+              placeholderTextColor="#6b7c74"
               value={checkoutEmail}
               onChangeText={setCheckoutEmail}
               autoCapitalize="none"
               keyboardType="email-address"
             />
 
-            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#38bdf8', marginBottom: 6 }]}>
+            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#6cc04a', marginBottom: 6 }]}>
               CÉDULA (FÍSICA O JURÍDICA DE CR)
             </Text>
             <TextInput
-              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#0f172a', borderColor: '#38bdf8', borderWidth: 2, color: '#ffffff', marginBottom: 18 }]}
+              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', borderColor: '#6cc04a', borderWidth: 2, color: '#1c2b22', marginBottom: 18 }]}
               placeholder="Ej: 1-1234-5678"
-              placeholderTextColor="#64748b"
+              placeholderTextColor="#6b7c74"
               value={checkoutCedula}
               onChangeText={setCheckoutCedula}
             />
 
-            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#38bdf8', marginBottom: 6 }]}>
+            <Text style={[styles.formEtiqueta, { fontSize: 16, fontWeight: '900', color: '#6cc04a', marginBottom: 6 }]}>
               TELÉFONO DE CONTACTO
             </Text>
             <TextInput
-              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#0f172a', borderColor: '#38bdf8', borderWidth: 2, color: '#ffffff', marginBottom: 24 }]}
+              style={[styles.formInput, { fontSize: 18, fontWeight: '700', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', borderColor: '#6cc04a', borderWidth: 2, color: '#1c2b22', marginBottom: 24 }]}
               placeholder="Ej: 8888-8888"
-              placeholderTextColor="#64748b"
+              placeholderTextColor="#6b7c74"
               value={checkoutTelefono}
               onChangeText={setCheckoutTelefono}
               keyboardType="phone-pad"
             />
 
-            <Text style={[styles.formEtiqueta, { fontSize: 14, fontWeight: '900', color: '#fbbf24', marginTop: 10, marginBottom: 8, textAlign: 'center' }]}>
+            <Text style={[styles.formEtiqueta, { fontSize: 14, fontWeight: '900', color: '#f97316', marginTop: 10, marginBottom: 8, textAlign: 'center' }]}>
               MÉTODO DE PAGO
             </Text>
 
             {/* Botón Principal: Pagar con Tilopay Sandbox */}
             <TouchableOpacity
-              style={[styles.botonCheckoutForm, { backgroundColor: '#0284c7', paddingVertical: 16, marginHorizontal: 0, marginBottom: 12, borderWidth: 1.5, borderColor: '#38bdf8' }]}
+              style={[styles.botonCheckoutForm, { backgroundColor: '#f97316', paddingVertical: 16, marginHorizontal: 0, marginBottom: 12, borderWidth: 1.5, borderColor: '#6cc04a' }]}
               onPress={procesarPagoTilopay}
             >
-              <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900', color: '#ffffff' }]}>
+              <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900', color: '#1c2b22' }]}>
                 💳 PAGAR CON TILOPAY (TARJETA / SANDBOX)
               </Text>
             </TouchableOpacity>
@@ -1723,7 +2634,7 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 12, backgroundColor: '#10b981' }]}
+                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 12, backgroundColor: '#22a34a' }]}
                 onPress={procesarCheckoutCliente}
               >
                 <Text style={[styles.botonCheckoutFormTexto, { fontSize: 14, fontWeight: '800' }]}>📝 Pago en Efectivo</Text>
@@ -1735,31 +2646,31 @@ export default function App() {
 
       {/* Menú Desplegable de Categorías con Ícono Hamburguesa ☰ */}
       {!mostrarCarritoModal && !mostrarFormularioFacturacion && sesion !== 'admin' && (sesion !== 'vendedor' || pestanaVendedor === 'pos') && (
-        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, backgroundColor: '#0f172a' }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, backgroundColor: '#ffffff' }}>
           <TouchableOpacity
             style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
-              backgroundColor: '#1e293b',
+              backgroundColor: '#eef7ea',
               paddingVertical: 12,
               paddingHorizontal: 16,
               borderRadius: 12,
               borderWidth: 2,
-              borderColor: '#38bdf8'
+              borderColor: '#6cc04a'
             }}
             onPress={() => setMostrarMenuCategorias(true)}
             activeOpacity={0.8}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={{ fontSize: 22, color: '#38bdf8', fontWeight: '900' }}>☰</Text>
+              <Text style={{ fontSize: 22, color: '#6cc04a', fontWeight: '900' }}>☰</Text>
               <View>
-                <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>FILTRAR POR CATEGORÍA</Text>
-                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '900', marginTop: 1 }}>{categoriaSeleccionada}</Text>
+                <Text style={{ color: '#5b6b62', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>FILTRAR POR CATEGORÍA</Text>
+                <Text style={{ color: '#1c2b22', fontSize: 16, fontWeight: '900', marginTop: 1 }}>{categoriaSeleccionada}</Text>
               </View>
             </View>
-            <View style={{ backgroundColor: '#0f172a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#38bdf8' }}>
-              <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
+            <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#6cc04a' }}>
+              <Text style={{ color: '#6cc04a', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -1773,12 +2684,12 @@ export default function App() {
         onRequestClose={() => setMostrarMenuCategorias(false)}
       >
         <View style={styles.modalDetalleCentrado}>
-          <View style={[styles.modalDetalleContenido, { maxWidth: 480, maxHeight: '80%', backgroundColor: '#0f172a', borderRadius: 16, borderWidth: 2, borderColor: '#38bdf8', padding: 20 }]}>
+          <View style={[styles.modalDetalleContenido, { maxWidth: 480, maxHeight: '80%', backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 2, borderColor: '#6cc04a', padding: 20 }]}>
             
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e1eed9', paddingBottom: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 22, color: '#38bdf8' }}>☰</Text>
-                <Text style={{ fontSize: 18, fontWeight: '950', color: '#ffffff' }}>Categorías de Productos</Text>
+                <Text style={{ fontSize: 22, color: '#6cc04a' }}>☰</Text>
+                <Text style={{ fontSize: 18, fontWeight: '950', color: '#1c2b22' }}>Categorías de Productos</Text>
               </View>
               <TouchableOpacity onPress={() => setMostrarMenuCategorias(false)} style={styles.botonModalCerrarIcono}>
                 <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
@@ -1786,34 +2697,34 @@ export default function App() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 10 }}>
-              {CATEGORIAS.map((cat, idx) => {
+              {['Todas', ...(dbCategorias.length > 0 ? dbCategorias.map(c => c.descripcion) : CATEGORIAS.slice(1))].map((cat, idx) => {
                 const estaActiva = categoriaSeleccionada === cat;
                 return (
                   <TouchableOpacity
                     key={`cat-menu-${cat}-${idx}`}
                     style={{
                       flexDirection: 'row',
-                      justify: 'space-between',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
                       paddingVertical: 14,
                       paddingHorizontal: 16,
-                      backgroundColor: estaActiva ? '#1e3a8a' : '#1e293b',
+                      backgroundColor: estaActiva ? '#ffedd5' : '#eef7ea',
                       borderRadius: 10,
                       marginBottom: 8,
                       borderWidth: 1.5,
-                      borderColor: estaActiva ? '#38bdf8' : '#334155'
+                      borderColor: estaActiva ? '#6cc04a' : '#cfe3c6'
                     }}
                     onPress={() => {
                       setCategoriaSeleccionada(cat);
                       setMostrarMenuCategorias(false);
                     }}
                   >
-                    <Text style={{ color: estaActiva ? '#ffffff' : '#e2e8f0', fontSize: 16, fontWeight: estaActiva ? '900' : '700' }}>
+                    <Text style={{ color: '#1c2b22', fontSize: 16, fontWeight: estaActiva ? '900' : '700' }}>
                       {cat}
                     </Text>
                     {estaActiva && (
-                      <View style={{ backgroundColor: '#10b981', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                        <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '900' }}>✓ Seleccionada</Text>
+                      <View style={{ backgroundColor: '#22a34a', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ color: '#1c2b22', fontSize: 12, fontWeight: '900' }}>✓ Seleccionada</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -1823,6 +2734,80 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+
+      {/* Modal Desplegable Limpio para Formularios del Administrador */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalSelectorTarget !== null}
+        onRequestClose={() => setModalSelectorTarget(null)}
+      >
+        <View style={styles.modalDetalleCentrado}>
+          <View style={[styles.modalDetalleContenido, { maxWidth: 460, maxHeight: '80%', backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 2, borderColor: '#6cc04a', padding: 20 }]}>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e1eed9', paddingBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 20, color: '#6cc04a' }}>🏷️</Text>
+                <Text style={{ fontSize: 18, fontWeight: '950', color: '#1c2b22' }}>Seleccionar Categoría</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalSelectorTarget(null)} style={styles.botonModalCerrarIcono}>
+                <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 10 }}>
+              {(modalSelectorTarget === 'reabastecer_filtro' || modalSelectorTarget === 'edit_filtro'
+                ? [{ id: 'Todas', descripcion: 'Todas' }, ...dbCategorias]
+                : dbCategorias
+              ).map((cat, idx) => {
+                const valorActual = 
+                  modalSelectorTarget === 'reabastecer_filtro' ? filtroCategoriaReabastecer :
+                  modalSelectorTarget === 'edit_filtro' ? filtroCategoriaEdit :
+                  modalSelectorTarget === 'nuevo_form' ? nuevoCategoriaId :
+                  editCategoriaId;
+
+                const esActivo = (typeof cat.id === 'number' ? cat.id === valorActual : cat.descripcion === valorActual);
+
+                return (
+                  <TouchableOpacity
+                    key={`mod-sel-${cat.id}-${idx}`}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      backgroundColor: esActivo ? '#ffedd5' : '#eef7ea',
+                      borderRadius: 10,
+                      marginBottom: 8,
+                      borderWidth: 1.5,
+                      borderColor: esActivo ? '#6cc04a' : '#cfe3c6'
+                    }}
+                    onPress={() => {
+                      if (modalSelectorTarget === 'reabastecer_filtro') setFiltroCategoriaReabastecer(cat.descripcion);
+                      else if (modalSelectorTarget === 'edit_filtro') setFiltroCategoriaEdit(cat.descripcion);
+                      else if (modalSelectorTarget === 'nuevo_form') setNuevoCategoriaId(cat.id);
+                      else if (modalSelectorTarget === 'edit_form') setEditCategoriaId(cat.id);
+                      setModalSelectorTarget(null);
+                    }}
+                  >
+                    <Text style={{ color: '#1c2b22', fontSize: 16, fontWeight: esActivo ? '900' : '700' }}>
+                      {cat.descripcion}
+                    </Text>
+                    {esActivo && (
+                      <View style={{ backgroundColor: '#22a34a', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ color: '#1c2b22', fontSize: 12, fontWeight: '900' }}>✓ Seleccionada</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
 
       {/* Panel del Administrador Gerencial */}
       {sesion === 'admin' ? (
@@ -1859,61 +2844,60 @@ export default function App() {
               >
                 <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'personal' && styles.fichaBotonTextoActiva]}>👥 Registrar Personal</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fichaBoton, pestanaAdmin === 'configuracion' && styles.fichaBotonActiva, { minWidth: 140 }]}
+                onPress={() => { setPestanaAdmin('configuracion'); cargarPerfilUsuario(); }}
+              >
+                <Text style={[styles.fichaBotonTexto, pestanaAdmin === 'configuracion' && styles.fichaBotonTextoActiva]}>⚙️ Configuración</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
 
           {pestanaAdmin === 'tabla_ventas' && (
-            <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 10 }}>
-              <Text style={[styles.seccionTitulo, { fontSize: 20, color: '#38bdf8', marginBottom: 12 }]}>
+            <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 10, width: '100%', maxWidth: 1300, alignSelf: 'center' }}>
+              <Text style={[styles.seccionTitulo, { fontSize: 22, color: '#6cc04a', marginBottom: 16 }]}>
                 📊 Tabla General de Ventas y Finanzas
               </Text>
               
-              {/* Tarjetas de Resumen Estadístico */}
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                <View style={{ flex: 1, backgroundColor: '#1e293b', borderRadius: 10, padding: 12, borderLeftWidth: 4, borderLeftColor: '#10b981' }}>
-                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '800' }}>INGRESOS TOTALES</Text>
-                  <Text style={{ color: '#10b981', fontSize: 16, fontWeight: '950', marginTop: 4 }}>
+              {/* Tarjetas de Resumen Estadístico Responsivas */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+                <View style={{ flex: 1, minWidth: 220, backgroundColor: '#eef7ea', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: '#22a34a' }}>
+                  <Text style={{ color: '#5b6b62', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>INGRESOS TOTALES</Text>
+                  <Text style={{ color: '#22a34a', fontSize: 20, fontWeight: '950', marginTop: 4 }}>
                     ₡{ordenesVenta.reduce((acc, o) => acc + (Number(o.total) || 0), 0).toFixed(2)}
                   </Text>
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#1e293b', borderRadius: 10, padding: 12, borderLeftWidth: 4, borderLeftColor: '#0284c7' }}>
-                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '800' }}>VENTAS DIRECTAS</Text>
-                  <Text style={{ color: '#38bdf8', fontSize: 16, fontWeight: '950', marginTop: 4 }}>
-                    {ordenesVenta.filter(o => !esOrdenEnsambleCheck(o)).length} órdenes
-                  </Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: '#1e293b', borderRadius: 10, padding: 12, borderLeftWidth: 4, borderLeftColor: '#f97316' }}>
-                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '800' }}>ENSAMBLES PC</Text>
-                  <Text style={{ color: '#f97316', fontSize: 16, fontWeight: '950', marginTop: 4 }}>
-                    {ordenesVenta.filter(o => esOrdenEnsambleCheck(o)).length} combos
+                <View style={{ flex: 1, minWidth: 220, backgroundColor: '#eef7ea', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: '#f97316' }}>
+                  <Text style={{ color: '#5b6b62', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>TOTAL DE VENTAS</Text>
+                  <Text style={{ color: '#6cc04a', fontSize: 20, fontWeight: '950', marginTop: 4 }}>
+                    {ordenesVenta.length} órdenes registradas
                   </Text>
                 </View>
               </View>
 
               {/* Buscador de Tabla */}
               <TextInput
-                style={[styles.formInput, { marginBottom: 12, fontSize: 14 }]}
+                style={[styles.formInput, { marginBottom: 16, fontSize: 15, paddingVertical: 12, backgroundColor: '#eef7ea', borderColor: '#cfe3c6' }]}
                 placeholder="🔍 Buscar por ID de orden, cliente o estado..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#5b6b62"
                 value={filtroTablaVentas}
                 onChangeText={setFiltroTablaVentas}
               />
 
-              {/* Tabla con scroll horizontal y vertical */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }}>
-                <View style={{ minWidth: 700 }}>
+              {/* Tabla Responsiva Dinámica */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1, width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
+                <View style={{ flex: 1, minWidth: 720 }}>
                   {/* Encabezado de Tabla */}
-                  <View style={{ flexDirection: 'row', backgroundColor: '#1e293b', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, marginBottom: 8 }}>
-                    <Text style={{ width: 70, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>ID</Text>
-                    <Text style={{ width: 140, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>Cliente</Text>
-                    <Text style={{ width: 120, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>Fecha</Text>
-                    <Text style={{ width: 100, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>Tipo</Text>
-                    <Text style={{ width: 110, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>Monto Total</Text>
-                    <Text style={{ width: 110, color: '#38bdf8', fontWeight: '900', fontSize: 12 }}>Estado</Text>
+                  <View style={{ flexDirection: 'row', backgroundColor: '#eef7ea', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#cfe3c6' }}>
+                    <Text style={{ flex: 0.8, minWidth: 70, color: '#6cc04a', fontWeight: '900', fontSize: 13 }}>ID</Text>
+                    <Text style={{ flex: 2, minWidth: 160, color: '#6cc04a', fontWeight: '900', fontSize: 13 }}>Cliente</Text>
+                    <Text style={{ flex: 1.5, minWidth: 140, color: '#6cc04a', fontWeight: '900', fontSize: 13 }}>Fecha</Text>
+                    <Text style={{ flex: 1.5, minWidth: 130, color: '#6cc04a', fontWeight: '900', fontSize: 13 }}>Monto Total</Text>
+                    <Text style={{ flex: 1.5, minWidth: 130, color: '#6cc04a', fontWeight: '900', fontSize: 13 }}>Estado</Text>
                   </View>
 
-                  {/* Filas de la Tabla */}
-                  <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={true}>
+                  {/* Filas de la Tabla sin restricción rígida de altura */}
+                  <ScrollView showsVerticalScrollIndicator={true} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
                     {ordenesVenta
                       .filter(o => {
                         if (!filtroTablaVentas) return true;
@@ -1921,34 +2905,29 @@ export default function App() {
                         return (
                           o.id.toString().includes(term) ||
                           (o.cliente_nombre && o.cliente_nombre.toLowerCase().includes(term)) ||
-                          (o.estado && o.estado.toLowerCase().includes(term)) ||
-                          (o.tipo_orden && o.tipo_orden.toLowerCase().includes(term))
+                          (o.estado && o.estado.toLowerCase().includes(term))
                         );
                       })
                       .map((item, idx) => {
-                        const esEnsamble = esOrdenEnsambleCheck(item);
                         return (
-                          <View key={`tbl-ord-${item.id}-${idx}`} style={{ flexDirection: 'row', backgroundColor: '#111827', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#1f2937', alignItems: 'center' }}>
-                            <Text style={{ width: 70, color: '#ffffff', fontWeight: '900', fontSize: 13 }}>#{item.id}</Text>
-                            <Text style={{ width: 140, color: '#e2e8f0', fontSize: 12 }} numberOfLines={1}>
+                          <View key={`tbl-ord-${item.id}-${idx}`} style={{ flexDirection: 'row', backgroundColor: '#ffffff', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 8, marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#e1eed9', alignItems: 'center' }}>
+                            <Text style={{ flex: 0.8, minWidth: 70, color: '#1c2b22', fontWeight: '900', fontSize: 14 }}>#{item.id}</Text>
+                            <Text style={{ flex: 2, minWidth: 160, color: '#2d3b33', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
                               {item.cliente_nombre || 'Cliente General'}
                             </Text>
-                            <Text style={{ width: 120, color: '#94a3b8', fontSize: 11 }}>{item.fecha}</Text>
-                            <Text style={{ width: 100, color: esEnsamble ? '#f97316' : '#38bdf8', fontWeight: '800', fontSize: 11 }}>
-                              {esEnsamble ? '⚙️ Ensamble' : '🏷️ Venta'}
-                            </Text>
-                            <Text style={{ width: 110, color: '#10b981', fontWeight: '900', fontSize: 13 }}>
+                            <Text style={{ flex: 1.5, minWidth: 140, color: '#5b6b62', fontSize: 12 }}>{item.fecha}</Text>
+                            <Text style={{ flex: 1.5, minWidth: 130, color: '#22a34a', fontWeight: '900', fontSize: 14 }}>
                               ₡{Number(item.total || 0).toFixed(2)}
                             </Text>
-                            <View style={{ width: 110 }}>
+                            <View style={{ flex: 1.5, minWidth: 130 }}>
                               <Text style={{
-                                color: item.estado === 'Entregado' || item.estado === 'Completado' ? '#10b981' : item.estado === 'Cancelado' ? '#ef4444' : '#eab308',
+                                color: item.estado === 'Entregado' || item.estado === 'Completado' ? '#22a34a' : item.estado === 'Cancelado' ? '#ef4444' : '#eab308',
                                 fontWeight: '800',
-                                fontSize: 11,
-                                backgroundColor: '#1f2937',
-                                paddingHorizontal: 6,
-                                paddingVertical: 2,
-                                borderRadius: 4,
+                                fontSize: 12,
+                                backgroundColor: '#e1eed9',
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
                                 alignSelf: 'flex-start'
                               }}>
                                 {item.estado || 'Pendiente'}
@@ -1967,22 +2946,22 @@ export default function App() {
             <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
               {/* Formulario de Reabastecimiento */}
               <View style={styles.formularioTarjeta}>
-                <Text style={styles.formEtiqueta}>Componente Seleccionado</Text>
-                <Text style={[styles.nombreTexto, { color: reabastecerProductoNombre ? '#10b981' : '#f87171', marginVertical: 6 }]}>
-                  {reabastecerProductoNombre ? `ID ${reabastecerProductoId}: ${reabastecerProductoNombre}` : 'Ninguno (Selecciona un componente de la lista abajo)'}
+                <Text style={styles.formEtiqueta}>Producto Seleccionado</Text>
+                <Text style={[styles.nombreTexto, { color: reabastecerProductoNombre ? '#22a34a' : '#f87171', marginVertical: 6 }]}>
+                  {reabastecerProductoNombre ? `ID ${reabastecerProductoId}: ${reabastecerProductoNombre}` : 'Ninguno (Selecciona un producto de la lista abajo)'}
                 </Text>
 
                 <Text style={styles.formEtiqueta}>Cantidad de Stock a Añadir</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 10"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={reabastecerCantidad}
                   onChangeText={setReabastecerCantidad}
                 />
                 <TouchableOpacity 
-                  style={[styles.botonAccionPrincipal, !reabastecerProductoId && { backgroundColor: '#475569' }]} 
+                  style={[styles.botonAccionPrincipal, !reabastecerProductoId && { backgroundColor: '#6b7c74' }]} 
                   onPress={manejarReabastecimiento}
                   disabled={!reabastecerProductoId}
                 >
@@ -1991,42 +2970,31 @@ export default function App() {
               </View>
 
               {/* Filtros de Búsqueda */}
-              <Text style={styles.seccionTitulo}>Buscar Componente</Text>
+              <Text style={styles.seccionTitulo}>Buscar Producto</Text>
               
               <Text style={styles.formEtiqueta}>Filtrar por Nombre</Text>
               <TextInput
                 style={styles.formInput}
                 placeholder="Escribe el nombre a buscar..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#5b6b62"
                 value={filtroNombreReabastecer}
                 onChangeText={setFiltroNombreReabastecer}
               />
 
               <Text style={styles.formEtiqueta}>Filtrar por Categoría</Text>
-              <View style={{ marginBottom: 16 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                  {['Todas', ...dbCategorias.map(c => c.descripcion)].map(cat => {
-                    const esActivo = filtroCategoriaReabastecer === cat;
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[
-                          styles.botonCategoriaOption,
-                          esActivo ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
-                        ]}
-                        onPress={() => setFiltroCategoriaReabastecer(cat)}
-                      >
-                        <Text style={esActivo ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
-                          {cat}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+              <TouchableOpacity
+                style={styles.dropdownSeleccionable}
+                onPress={() => setModalSelectorTarget('reabastecer_filtro')}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#1c2b22', fontSize: 15, fontWeight: '800' }}>
+                  {filtroCategoriaReabastecer}
+                </Text>
+                <Text style={{ color: '#6cc04a', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
+              </TouchableOpacity>
 
               {/* Inventario de Referencia Filtrado */}
-              <Text style={styles.seccionTitulo}>Seleccionar Componente ({productosFiltradosReabastecer.length})</Text>
+              <Text style={styles.seccionTitulo}>Seleccionar Producto ({productosFiltradosReabastecer.length})</Text>
               {productosFiltradosReabastecer.map(p => {
                 const seleccionado = reabastecerProductoId === p.id.toString();
                 return (
@@ -2034,7 +3002,7 @@ export default function App() {
                     key={p.id} 
                     style={[
                       styles.tarjetaProductoReferencia, 
-                      seleccionado && { borderColor: '#10b981', borderLeftColor: '#10b981', borderWidth: 2 }
+                      seleccionado && { borderColor: '#22a34a', borderLeftColor: '#22a34a', borderWidth: 2 }
                     ]}
                     onPress={() => {
                       setReabastecerProductoId(p.id.toString());
@@ -2042,11 +3010,11 @@ export default function App() {
                     }}
                   >
                     <Text style={styles.nombreTexto}>ID {p.id}: {p.nombre}</Text>
-                    <Text style={[styles.stockTexto, { color: p.stock <= 0 ? '#f87171' : '#34d399' }]}>
+                    <Text style={[styles.stockTexto, { color: p.stock <= 0 ? '#f87171' : '#4ade80' }]}>
                       Stock Actual: {p.stock} uds ({p.categoria_nombre})
                     </Text>
                     {seleccionado && (
-                      <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
+                      <Text style={{ color: '#22a34a', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
                         ✓ Seleccionado para Reabastecer
                       </Text>
                     )}
@@ -2060,18 +3028,18 @@ export default function App() {
             <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
               {/* Formulario de Edición */}
               <View style={styles.formularioTarjeta}>
-                <Text style={styles.formEtiqueta}>Componente Seleccionado</Text>
-                <Text style={[styles.nombreTexto, { color: editNombre ? '#10b981' : '#f87171', marginVertical: 6 }]}>
-                  {editNombre ? `ID ${editProductoId}: ${editNombre}` : 'Ninguno (Selecciona un componente de la lista abajo)'}
+                <Text style={styles.formEtiqueta}>Producto Seleccionado</Text>
+                <Text style={[styles.nombreTexto, { color: editNombre ? '#22a34a' : '#f87171', marginVertical: 6 }]}>
+                  {editNombre ? `ID ${editProductoId}: ${editNombre}` : 'Ninguno (Selecciona un producto de la lista abajo)'}
                 </Text>
 
                 {editProductoId ? (
                   <>
-                    <Text style={styles.formEtiqueta}>Nombre del Componente</Text>
+                    <Text style={styles.formEtiqueta}>Nombre del Producto</Text>
                     <TextInput
                       style={styles.formInput}
-                      placeholder="Ej: Intel Core i9-14900K"
-                      placeholderTextColor="#94a3b8"
+                      placeholder="Ej: Nombre del artículo"
+                      placeholderTextColor="#5b6b62"
                       value={editNombre}
                       onChangeText={setEditNombre}
                     />
@@ -2079,8 +3047,8 @@ export default function App() {
                     <Text style={styles.formEtiqueta}>Descripción</Text>
                     <TextInput
                       style={styles.formInput}
-                      placeholder="Ej: Procesador potente de 24 núcleos"
-                      placeholderTextColor="#94a3b8"
+                      placeholder="Ej: Descripción detallada del producto"
+                      placeholderTextColor="#5b6b62"
                       value={editDescripcion}
                       onChangeText={setEditDescripcion}
                     />
@@ -2089,7 +3057,7 @@ export default function App() {
                     <TextInput
                       style={styles.formInput}
                       placeholder="Ej: 250000"
-                      placeholderTextColor="#94a3b8"
+                      placeholderTextColor="#5b6b62"
                       keyboardType="numeric"
                       value={editCosto}
                       onChangeText={setEditCosto}
@@ -2099,40 +3067,29 @@ export default function App() {
                     <TextInput
                       style={styles.formInput}
                       placeholder="Ej: 50000"
-                      placeholderTextColor="#94a3b8"
+                      placeholderTextColor="#5b6b62"
                       keyboardType="numeric"
                       value={editGanancia}
                       onChangeText={setEditGanancia}
                     />
 
                     <Text style={styles.formEtiqueta}>Categoría</Text>
-                    <View style={{ marginBottom: 12 }}>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                        {dbCategorias.map(cat => {
-                          const seleccionado = editCategoriaId === cat.id;
-                          return (
-                            <TouchableOpacity
-                              key={cat.id}
-                              style={[
-                                styles.botonCategoriaOption,
-                                seleccionado ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
-                              ]}
-                              onPress={() => setEditCategoriaId(cat.id)}
-                            >
-                              <Text style={seleccionado ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
-                                {cat.descripcion}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.dropdownSeleccionable}
+                      onPress={() => setModalSelectorTarget('edit_form')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ color: '#1c2b22', fontSize: 15, fontWeight: '800' }}>
+                        {dbCategorias.find(c => c.id === editCategoriaId)?.descripcion || 'Seleccionar Categoría...'}
+                      </Text>
+                      <Text style={{ color: '#6cc04a', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
+                    </TouchableOpacity>
 
                     <Text style={styles.formEtiqueta}>URL de la Imagen</Text>
                     <TextInput
                       style={styles.formInput}
                       placeholder="https://ejemplo.com/imagen.png"
-                      placeholderTextColor="#94a3b8"
+                      placeholderTextColor="#5b6b62"
                       value={editImagen}
                       onChangeText={setEditImagen}
                       autoCapitalize="none"
@@ -2142,7 +3099,7 @@ export default function App() {
                     <TextInput
                       style={styles.formInput}
                       placeholder="Ej: 10 (para 10% de descuento)"
-                      placeholderTextColor="#94a3b8"
+                      placeholderTextColor="#5b6b62"
                       keyboardType="numeric"
                       value={editDescuento}
                       onChangeText={setEditDescuento}
@@ -2160,42 +3117,31 @@ export default function App() {
               </View>
 
               {/* Filtros de Búsqueda para Editar */}
-              <Text style={styles.seccionTitulo}>Buscar Componente para Editar</Text>
+              <Text style={styles.seccionTitulo}>Buscar Producto para Editar</Text>
               
               <Text style={styles.formEtiqueta}>Filtrar por Nombre</Text>
               <TextInput
                 style={styles.formInput}
                 placeholder="Escribe el nombre a buscar..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#5b6b62"
                 value={filtroNombreEdit}
                 onChangeText={setFiltroNombreEdit}
               />
 
               <Text style={styles.formEtiqueta}>Filtrar por Categoría</Text>
-              <View style={{ marginBottom: 16 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                  {['Todas', ...dbCategorias.map(c => c.descripcion)].map(cat => {
-                    const esActivo = filtroCategoriaEdit === cat;
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[
-                          styles.botonCategoriaOption,
-                          esActivo ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
-                        ]}
-                        onPress={() => setFiltroCategoriaEdit(cat)}
-                      >
-                        <Text style={esActivo ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
-                          {cat}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+              <TouchableOpacity
+                style={styles.dropdownSeleccionable}
+                onPress={() => setModalSelectorTarget('edit_filtro')}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#1c2b22', fontSize: 15, fontWeight: '800' }}>
+                  {filtroCategoriaEdit}
+                </Text>
+                <Text style={{ color: '#6cc04a', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
+              </TouchableOpacity>
 
               {/* Lista de Productos para Editar */}
-              <Text style={styles.seccionTitulo}>Seleccionar Componente ({productosFiltradosEdit.length})</Text>
+              <Text style={styles.seccionTitulo}>Seleccionar Producto ({productosFiltradosEdit.length})</Text>
               {productosFiltradosEdit.map(p => {
                 const seleccionado = editProductoId === p.id.toString();
                 return (
@@ -2203,7 +3149,7 @@ export default function App() {
                     key={p.id} 
                     style={[
                       styles.tarjetaProductoReferencia, 
-                      seleccionado && { borderColor: '#10b981', borderLeftColor: '#10b981', borderWidth: 2 }
+                      seleccionado && { borderColor: '#22a34a', borderLeftColor: '#22a34a', borderWidth: 2 }
                     ]}
                     onPress={() => {
                       setEditProductoId(p.id.toString());
@@ -2221,7 +3167,7 @@ export default function App() {
                       Precio Final: ₡{Number(p.precio || (p.precio_costo + p.margen_ganancia) || 0).toFixed(2)} ({p.categoria_nombre})
                     </Text>
                     {seleccionado && (
-                      <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
+                      <Text style={{ color: '#22a34a', fontWeight: '800', fontSize: 11, marginTop: 4, textTransform: 'uppercase' }}>
                         ✓ Cargado en el Editor
                       </Text>
                     )}
@@ -2234,19 +3180,19 @@ export default function App() {
           {pestanaAdmin === 'agregar' && (
             <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
               <View style={styles.formularioTarjeta}>
-                <Text style={styles.formEtiqueta}>Nombre del Componente</Text>
+                <Text style={styles.formEtiqueta}>Nombre del Producto</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Ej: Intel Core i9-14900K"
-                  placeholderTextColor="#94a3b8"
+                  placeholder="Ej: Nombre del artículo"
+                  placeholderTextColor="#5b6b62"
                   value={nuevoNombre}
                   onChangeText={setNuevoNombre}
                 />
                 <Text style={styles.formEtiqueta}>Descripción</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Ej: Procesador potente de 24 núcleos"
-                  placeholderTextColor="#94a3b8"
+                  placeholder="Ej: Descripción detallada del producto"
+                  placeholderTextColor="#5b6b62"
                   value={nuevoDescripcion}
                   onChangeText={setNuevoDescripcion}
                 />
@@ -2254,7 +3200,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 10"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={nuevoStock}
                   onChangeText={setNuevoStock}
@@ -2263,7 +3209,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 250000"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={nuevoCosto}
                   onChangeText={setNuevoCosto}
@@ -2272,33 +3218,22 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 50000"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={nuevoGanancia}
                   onChangeText={setNuevoGanancia}
                 />
                 <Text style={styles.formEtiqueta}>Seleccionar Categoría</Text>
-                <View style={{ marginBottom: 12 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                    {dbCategorias.map(cat => {
-                      const seleccionado = nuevoCategoriaId === cat.id;
-                      return (
-                        <TouchableOpacity
-                          key={cat.id}
-                          style={[
-                            styles.botonCategoriaOption,
-                            seleccionado ? styles.botonCategoriaOptionActivo : styles.botonCategoriaOptionInactivo
-                          ]}
-                          onPress={() => setNuevoCategoriaId(cat.id)}
-                        >
-                          <Text style={seleccionado ? styles.textoCategoriaOptionActivo : styles.textoCategoriaOptionInactivo}>
-                            {cat.descripcion}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
+                <TouchableOpacity
+                  style={styles.dropdownSeleccionable}
+                  onPress={() => setModalSelectorTarget('nuevo_form')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#1c2b22', fontSize: 15, fontWeight: '800' }}>
+                    {dbCategorias.find(c => c.id === nuevoCategoriaId)?.descripcion || 'Seleccionar Categoría...'}
+                  </Text>
+                  <Text style={{ color: '#6cc04a', fontSize: 13, fontWeight: '900' }}>Cambiar ▾</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.botonCrearNuevaCategoriaToggle}
@@ -2314,8 +3249,8 @@ export default function App() {
                     <Text style={styles.subFormEtiqueta}>Nombre de la Nueva Categoría</Text>
                     <TextInput
                       style={styles.subFormInput}
-                      placeholder="Ej: Fuentes de Poder"
-                      placeholderTextColor="#94a3b8"
+                      placeholder="Ej: Nueva Categoría"
+                      placeholderTextColor="#5b6b62"
                       value={nuevaCategoriaDescripcion}
                       onChangeText={setNuevaCategoriaDescripcion}
                     />
@@ -2329,7 +3264,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="https://ejemplo.com/imagen.png"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   value={nuevoImagen}
                   onChangeText={setNuevoImagen}
                   autoCapitalize="none"
@@ -2339,7 +3274,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 10 (para 10% de descuento)"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={nuevoDescuento}
                   onChangeText={setNuevoDescuento}
@@ -2355,11 +3290,19 @@ export default function App() {
           {pestanaAdmin === 'personal' && (
             <ScrollView style={{ marginTop: 10 }} contentContainerStyle={{ paddingBottom: 50 }}>
               <View style={styles.formularioTarjeta}>
+                <Text style={styles.formEtiqueta}>Nombre Completo de la Persona</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Ej: Carlos Mendoza"
+                  placeholderTextColor="#5b6b62"
+                  value={empNombre}
+                  onChangeText={setEmpNombre}
+                />
                 <Text style={styles.formEtiqueta}>Correo Electrónico de Empleado</Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="empleado@hardwarestore.com"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   autoCapitalize="none"
                   keyboardType="email-address"
                   value={empEmail}
@@ -2369,7 +3312,7 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="••••••••"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   secureTextEntry={true}
                   value={empPassword}
                   onChangeText={setEmpPassword}
@@ -2378,10 +3321,32 @@ export default function App() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Ej: 2"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#5b6b62"
                   keyboardType="numeric"
                   value={empRolId}
                   onChangeText={setEmpRolId}
+                />
+                <Text style={styles.formEtiqueta}>🔐 Pregunta de Seguridad</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {PREGUNTAS_SEGURIDAD.map((p) => (
+                    <TouchableOpacity
+                      key={`preg-${p}`}
+                      onPress={() => setEmpPregunta(p)}
+                      style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: empPregunta === p ? '#f97316' : '#cfe3c6', backgroundColor: empPregunta === p ? '#ffedd5' : '#ffffff' }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#1c2b22' }}>{p}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.formEtiqueta}>Respuesta de Seguridad</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Respuesta (no importan mayúsculas ni tildes)"
+                  placeholderTextColor="#5b6b62"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={empRespuesta}
+                  onChangeText={setEmpRespuesta}
                 />
                 <TouchableOpacity style={styles.botonAccionPrincipal} onPress={manejarRegistroEmpleado}>
                   <Text style={styles.botonAccionPrincipalTexto}>Registrar Empleado</Text>
@@ -2389,18 +3354,21 @@ export default function App() {
               </View>
             </ScrollView>
           )}
+
+          {pestanaAdmin === 'configuracion' && renderModuloConfiguracion()}
         </View>
-      ) : sesion === 'vendedor' && (pestanaVendedor === 'ordenes_ventas' || pestanaVendedor === 'ordenes_ensambles') ? (
+      ) : sesion === 'vendedor' && pestanaVendedor === 'configuracion' ? (
+        <View style={styles.contenedorAdminPanel}>
+          {renderModuloConfiguracion()}
+        </View>
+      ) : sesion === 'vendedor' && pestanaVendedor === 'ordenes_ventas' ? (
         <View style={styles.contenedorAdminPanel}>
           <Text style={[styles.seccionTitulo, { marginHorizontal: 16, marginTop: 10 }]}>
-            {pestanaVendedor === 'ordenes_ensambles' ? '⚙️ Módulo de Órdenes de Ensamble de PC' : '🏷️ Módulo de Órdenes de Ventas Directas'}
+            🏷️ Módulo de Órdenes de Venta
           </Text>
 
           <FlatList
-            data={ordenesVenta.filter(o => {
-              const esEnsamble = esOrdenEnsambleCheck(o);
-              return pestanaVendedor === 'ordenes_ensambles' ? esEnsamble : !esEnsamble;
-            })}
+            data={ordenesVenta}
             keyExtractor={item => item.id.toString()}
             showsVerticalScrollIndicator={false}
             renderItem={renderTarjetaOrden}
@@ -2411,15 +3379,18 @@ export default function App() {
         !mostrarCarritoModal && !mostrarFormularioFacturacion && (
           cargando ? (
             <View style={styles.cargandoContenedor}>
-              <ActivityIndicator size="large" color="#1e3a8a" />
-              <Text style={styles.cargandoTexto}>Consultando catálogo de hardware...</Text>
+              <ActivityIndicator size="large" color="#ffedd5" />
+              <Text style={styles.cargandoTexto}>Consultando catálogo de productos...</Text>
             </View>
           ) : (
             <FlatList
+              key={`catalog-grid-${numColumns}`}
               data={productosFiltrados}
               renderItem={renderProducto}
               keyExtractor={item => item.id.toString()}
-              contentContainerStyle={styles.listaProductos}
+              numColumns={numColumns}
+              contentContainerStyle={[styles.listaProductos, { maxWidth: 1300, width: '100%', alignSelf: 'center', paddingHorizontal: 16 }]}
+              columnWrapperStyle={numColumns > 1 ? { justifyContent: 'flex-start', gap: 14 } : undefined}
               showsVerticalScrollIndicator={false}
             />
           )
@@ -2429,7 +3400,7 @@ export default function App() {
       {/* Módulo flotante inferior para el carrito de compras - Botón compacto directo al carrito */}
       {!mostrarCarritoModal && !mostrarFormularioFacturacion && sesion !== 'admin' && (sesion !== 'vendedor' || pestanaVendedor === 'pos') && carrito.length > 0 && (
         <View style={[styles.carritoFlotante, { padding: 12 }]}>
-          <TouchableOpacity onPress={procesarCompra} style={[styles.botonProcesarVenta, { backgroundColor: '#10b981', paddingVertical: 14 }]}>
+          <TouchableOpacity onPress={procesarCompra} style={[styles.botonProcesarVenta, { backgroundColor: '#22a34a', paddingVertical: 14 }]}>
             <Text style={[styles.botonProcesarTexto, { fontSize: 16, fontWeight: '900' }]}>
               {sesion === 'vendedor'
                 ? `🛒 FACTURAR EN CAJA (${carrito.reduce((sum, item) => sum + item.cantidad, 0)}) - ₡${calcularTotal()}`
@@ -2459,21 +3430,26 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Imagen del Producto */}
-                <Image
-                  source={
-                    (productoSeleccionadoDetalle.imagen && productoSeleccionadoDetalle.imagen.trim() !== '')
-                      ? { uri: productoSeleccionadoDetalle.imagen }
-                      : (IMAGENES_PRODUCTOS[productoSeleccionadoDetalle.id] || IMAGEN_DEFAULT)
-                  }
-                  style={styles.modalDetalleImagen}
-                />
+                {/* Frame Exhibidor de Imagen del Producto */}
+                <View style={styles.modalContenedorImagenFrame}>
+                  <Image
+                    source={
+                      (productoSeleccionadoDetalle.imagen && productoSeleccionadoDetalle.imagen.trim() !== '')
+                        ? { uri: productoSeleccionadoDetalle.imagen }
+                        : (IMAGENES_PRODUCTOS[productoSeleccionadoDetalle.id] || IMAGEN_DEFAULT)
+                    }
+                    style={styles.modalDetalleImagen}
+                    {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
+                  />
+                </View>
 
                 {/* Info del Producto */}
                 <Text style={styles.modalDetalleTitulo}>{productoSeleccionadoDetalle.nombre}</Text>
                 
-                <Text style={styles.formEtiqueta}>Descripción</Text>
-                <Text style={styles.modalDetalleDescripcion}>{productoSeleccionadoDetalle.descripcion}</Text>
+                <Text style={styles.subFormEtiqueta}>DESCRIPCIÓN DEL PRODUCTO</Text>
+                <View style={styles.modalContenedorDescripcion}>
+                  <Text style={styles.modalDetalleDescripcion}>{productoSeleccionadoDetalle.descripcion}</Text>
+                </View>
 
                 <View style={styles.modalDetalleFilaInfo}>
                   <View>
@@ -2484,7 +3460,7 @@ export default function App() {
                           ₡{Number(productoSeleccionadoDetalle.precio_base || (productoSeleccionadoDetalle.precio / (1 - productoSeleccionadoDetalle.descuento_porcentaje / 100))).toFixed(2)}
                         </Text>
                         <View style={{ backgroundColor: '#b91c1c', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ color: '#ffffff', fontSize: 9, fontWeight: '900' }}>
+                          <Text style={{ color: '#1c2b22', fontSize: 9, fontWeight: '900' }}>
                             OFERTA -{productoSeleccionadoDetalle.descuento_porcentaje}%
                           </Text>
                         </View>
@@ -2510,8 +3486,8 @@ export default function App() {
                     disabled={productoSeleccionadoDetalle.stock <= 0}
                     style={[
                       styles.botonAccionPrincipal,
-                      { marginTop: 24, backgroundColor: '#10b981' },
-                      productoSeleccionadoDetalle.stock <= 0 && { backgroundColor: '#4b5563' }
+                      { marginTop: 24, backgroundColor: '#22a34a' },
+                      productoSeleccionadoDetalle.stock <= 0 && { backgroundColor: '#b9d4ae' }
                     ]}
                     onPress={() => {
                       agregarAlCarrito(productoSeleccionadoDetalle);
@@ -2525,7 +3501,7 @@ export default function App() {
                 )}
 
                 <TouchableOpacity
-                  style={[styles.botonAccionPrincipal, { marginTop: 10, backgroundColor: '#374151' }]}
+                  style={[styles.botonAccionPrincipal, { marginTop: 10, backgroundColor: '#cfe3c6' }]}
                   onPress={() => setProductoSeleccionadoDetalle(null)}
                 >
                   <Text style={styles.botonAccionPrincipalTexto}>Volver al Catálogo</Text>
@@ -2535,6 +3511,7 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
 
       {/* Modal de Detalle Completo de la Orden */}
       <Modal
@@ -2550,11 +3527,11 @@ export default function App() {
                 {/* Header */}
                 <View style={styles.modalDetalleHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text style={[styles.nombreTexto, { color: '#38bdf8', fontSize: 20, fontWeight: '950' }]}>
+                    <Text style={[styles.nombreTexto, { color: '#6cc04a', fontSize: 20, fontWeight: '950' }]}>
                       Orden #{ordenSeleccionadaDetalle.id}
                     </Text>
-                    <View style={{ backgroundColor: '#10b98120', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#10b981' }}>
-                      <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '900' }}>
+                    <View style={{ backgroundColor: '#22a34a20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#22a34a' }}>
+                      <Text style={{ color: '#22a34a', fontSize: 11, fontWeight: '900' }}>
                         {(ordenSeleccionadaDetalle.estado || 'Pendiente').toUpperCase()}
                       </Text>
                     </View>
@@ -2565,35 +3542,35 @@ export default function App() {
                 </View>
 
                 <Text style={styles.subFormEtiqueta}>DATOS DEL CLIENTE</Text>
-                <View style={[styles.subFormularioTarjeta, { marginBottom: 16, backgroundColor: '#0f172a' }]}>
-                  <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '800' }}>
+                <View style={[styles.subFormularioTarjeta, { marginBottom: 16, backgroundColor: '#ffffff' }]}>
+                  <Text style={{ color: '#1c2b22', fontSize: 15, fontWeight: '800' }}>
                     👤 {ordenSeleccionadaDetalle.cliente_nombre || 'Cliente General'}
                   </Text>
-                  <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>
+                  <Text style={{ color: '#5b6b62', fontSize: 13, marginTop: 2 }}>
                     ✉️ {ordenSeleccionadaDetalle.cliente_correo || 'Sin correo'} | 📞 {ordenSeleccionadaDetalle.cliente_telefono || 'N/A'}
                   </Text>
-                  <Text style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                  <Text style={{ color: '#6b7c74', fontSize: 12, marginTop: 4 }}>
                     📅 Fecha: {ordenSeleccionadaDetalle.fecha || 'N/A'}
                   </Text>
                 </View>
 
                 {/* Desglose de Productos */}
                 <Text style={styles.subFormEtiqueta}>DESGLOSE DE PRODUCTOS</Text>
-                <View style={{ backgroundColor: '#0f172a', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1e293b', marginBottom: 16 }}>
+                <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#eef7ea', marginBottom: 16 }}>
                   {(ordenSeleccionadaDetalle.descripcion || 'Sin ítems registrados')
                     .split(', ')
                     .filter(Boolean)
                     .map((prodItem, idx) => (
-                      <View key={`item-det-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: idx < ordenSeleccionadaDetalle.descripcion.split(', ').length - 1 ? 1 : 0, borderBottomColor: '#1f2937' }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: '#334155' }}>
+                      <View key={`item-det-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: idx < ordenSeleccionadaDetalle.descripcion.split(', ').length - 1 ? 1 : 0, borderBottomColor: '#e1eed9' }}>
+                        <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#eef7ea', justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: '#cfe3c6' }}>
                           <Text style={{ fontSize: 16 }}>📦</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>
+                          <Text style={{ color: '#1c2b22', fontSize: 14, fontWeight: '800' }}>
                             {prodItem}
                           </Text>
-                          <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
-                            ✓ Componente Confirmado
+                          <Text style={{ color: '#6cc04a', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+                            ✓ Producto Confirmado
                           </Text>
                         </View>
                       </View>
@@ -2601,7 +3578,7 @@ export default function App() {
                 </View>
 
                 {/* Totales Financieros */}
-                <View style={{ backgroundColor: '#0f172a', borderRadius: 12, padding: 16, borderWidth: 1.5, borderColor: '#38bdf8', marginBottom: 20 }}>
+                <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, borderWidth: 1.5, borderColor: '#6cc04a', marginBottom: 20 }}>
                   {(() => {
                     const totalMonto = Number(ordenSeleccionadaDetalle.total || 0);
                     const subtotalNeto = totalMonto / 1.13;
@@ -2610,16 +3587,16 @@ export default function App() {
                     return (
                       <View style={{ gap: 6 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ color: '#94a3b8', fontSize: 13 }}>Subtotal Neto:</Text>
-                          <Text style={{ color: '#e2e8f0', fontSize: 14, fontWeight: '800' }}>₡{subtotalNeto.toFixed(2)}</Text>
+                          <Text style={{ color: '#5b6b62', fontSize: 13 }}>Subtotal Neto:</Text>
+                          <Text style={{ color: '#2d3b33', fontSize: 14, fontWeight: '800' }}>₡{subtotalNeto.toFixed(2)}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ color: '#fbbf24', fontSize: 13, fontWeight: '800' }}>IVA Obligatorio (13%):</Text>
-                          <Text style={{ color: '#fbbf24', fontSize: 14, fontWeight: '800' }}>₡{ivaMonto.toFixed(2)}</Text>
+                          <Text style={{ color: '#f97316', fontSize: 13, fontWeight: '800' }}>IVA Obligatorio (13%):</Text>
+                          <Text style={{ color: '#f97316', fontSize: 14, fontWeight: '800' }}>₡{ivaMonto.toFixed(2)}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1f2937' }}>
-                          <Text style={{ color: '#38bdf8', fontSize: 16, fontWeight: '900' }}>Total Orden:</Text>
-                          <Text style={{ color: '#10b981', fontSize: 22, fontWeight: '950' }}>₡{totalMonto.toFixed(2)}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e1eed9' }}>
+                          <Text style={{ color: '#6cc04a', fontSize: 16, fontWeight: '900' }}>Total Orden:</Text>
+                          <Text style={{ color: '#22a34a', fontSize: 22, fontWeight: '950' }}>₡{totalMonto.toFixed(2)}</Text>
                         </View>
                       </View>
                     );
@@ -2627,14 +3604,14 @@ export default function App() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.botonAccionPrincipal, { backgroundColor: '#4b5563', marginBottom: 10 }]}
+                  style={[styles.botonAccionPrincipal, { backgroundColor: '#b9d4ae', marginBottom: 10 }]}
                   onPress={() => generarFacturaPDF(ordenSeleccionadaDetalle)}
                 >
                   <Text style={styles.botonAccionPrincipalTexto}>📄 Generar Factura PDF</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.botonAccionPrincipal, { backgroundColor: '#374151' }]}
+                  style={[styles.botonAccionPrincipal, { backgroundColor: '#cfe3c6' }]}
                   onPress={() => setOrdenSeleccionadaDetalle(null)}
                 >
                   <Text style={styles.botonAccionPrincipalTexto}>Cerrar Ventana</Text>
@@ -2644,6 +3621,7 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
 
       {/* Modal del Rastreador de Pedidos para Clientes */}
       <Modal
@@ -2669,26 +3647,26 @@ export default function App() {
               <TextInput
                 style={styles.formInput}
                 placeholder="Ej: 1001"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#5b6b62"
                 keyboardType="numeric"
                 value={rastrearCodigo}
                 onChangeText={setRastrearCodigo}
               />
 
-              <TouchableOpacity style={[styles.botonAccionPrincipal, { backgroundColor: '#3b82f6', marginBottom: 16 }]} onPress={ejecutarRastreo}>
+              <TouchableOpacity style={[styles.botonAccionPrincipal, { backgroundColor: '#f97316', marginBottom: 16 }]} onPress={ejecutarRastreo}>
                 <Text style={styles.botonAccionPrincipalTexto}>Buscar Estado</Text>
               </TouchableOpacity>
 
               {rastreoVenta ? (
                 <View style={{ marginTop: 10 }}>
-                  <Text style={[styles.nombreTexto, { color: '#38bdf8', fontSize: 22, fontWeight: '950', marginBottom: 8 }]}>
+                  <Text style={[styles.nombreTexto, { color: '#6cc04a', fontSize: 22, fontWeight: '950', marginBottom: 8 }]}>
                     Orden #{rastreoVenta.id}
                   </Text>
                   
                   <Text style={styles.descripcionTexto}>Fecha: {rastreoVenta.fecha}</Text>
                   <Text style={styles.descripcionTexto}>Cliente: {rastreoVenta.cliente_nombre}</Text>
                   <Text style={styles.descripcionTexto}>Productos: {rastreoVenta.descripcion}</Text>
-                  <Text style={[styles.nombreTexto, { color: '#10b981', marginVertical: 8 }]}>
+                  <Text style={[styles.nombreTexto, { color: '#22a34a', marginVertical: 8 }]}>
                     Total: ₡{Number(rastreoVenta.total || 0).toFixed(2)}
                   </Text>
 
@@ -2700,107 +3678,53 @@ export default function App() {
                       <Text style={{ color: '#f87171', fontWeight: '900', fontSize: 13 }}>✕ PEDIDO CANCELADO</Text>
                     </View>
                   ) : (
-                    <View style={{ marginTop: 12, paddingVertical: 15, paddingHorizontal: 10, backgroundColor: '#0a0e1a', borderRadius: 10, borderWidth: 1, borderColor: '#1f2937' }}>
+                    <View style={{ marginTop: 12, paddingVertical: 15, paddingHorizontal: 10, backgroundColor: '#f3faef', borderRadius: 10, borderWidth: 1, borderColor: '#e1eed9' }}>
                       {/* Línea de Progreso Horizontal */}
-                      {rastreoVenta.tipo_orden === 'ensamble' ? (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', position: 'relative' }}>
-                          
-                          {/* Estado 1: Pendiente */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: '#10b981', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>1</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Pendiente</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', position: 'relative' }}>
+                        
+                        {/* Estado 1: Pendiente */}
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <View style={{
+                            width: 24, height: 24, borderRadius: 12, 
+                            backgroundColor: '#22a34a', 
+                            justifyContent: 'center', alignItems: 'center'
+                          }}>
+                            <Text style={{ color: '#1c2b22', fontSize: 10, fontWeight: 'bold' }}>1</Text>
                           </View>
-
-                          {/* Estado 2: Ensamblando */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: (rastreoVenta.estado === 'Ensamblando' || rastreoVenta.estado === 'Listo para Retirar' || rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#10b981' : '#374151', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>2</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Ensamblando</Text>
-                          </View>
-
-                          {/* Estado 3: Listo para Retirar */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: (rastreoVenta.estado === 'Listo para Retirar' || rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#10b981' : '#374151', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Listo Retiro</Text>
-                          </View>
-
-                          {/* Estado 4: Entregado */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: (rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#10b981' : '#374151', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>4</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Entregado</Text>
-                          </View>
-
+                          <Text style={{ color: '#5b6b62', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Pendiente</Text>
                         </View>
-                      ) : (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', position: 'relative' }}>
-                          
-                          {/* Estado 1: Pendiente */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: '#10b981', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>1</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Pendiente</Text>
-                          </View>
 
-                          {/* Estado 2: Listo para Retirar */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: (rastreoVenta.estado === 'Listo para Retirar' || rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#10b981' : '#374151', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>2</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Listo Retiro</Text>
+                        {/* Estado 2: Listo para Retirar */}
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <View style={{
+                            width: 24, height: 24, borderRadius: 12, 
+                            backgroundColor: (rastreoVenta.estado === 'Listo para Retirar' || rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#22a34a' : '#cfe3c6', 
+                            justifyContent: 'center', alignItems: 'center'
+                          }}>
+                            <Text style={{ color: '#1c2b22', fontSize: 10, fontWeight: 'bold' }}>2</Text>
                           </View>
-
-                          {/* Estado 3: Entregado */}
-                          <View style={{ alignItems: 'center', flex: 1 }}>
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 12, 
-                              backgroundColor: (rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#10b981' : '#374151', 
-                              justifyContent: 'center', alignItems: 'center'
-                            }}>
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
-                            </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Entregado</Text>
-                          </View>
-
+                          <Text style={{ color: '#5b6b62', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Listo Retiro</Text>
                         </View>
-                      )}
+
+                        {/* Estado 3: Entregado */}
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <View style={{
+                            width: 24, height: 24, borderRadius: 12, 
+                            backgroundColor: (rastreoVenta.estado === 'Entregado' || rastreoVenta.estado === 'Completado') ? '#22a34a' : '#cfe3c6', 
+                            justifyContent: 'center', alignItems: 'center'
+                          }}>
+                            <Text style={{ color: '#1c2b22', fontSize: 10, fontWeight: 'bold' }}>3</Text>
+                          </View>
+                          <Text style={{ color: '#5b6b62', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Entregado</Text>
+                        </View>
+
+                      </View>
                     </View>
                   )}
                 </View>
               ) : (
-                <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 20 }}>
-                  Ingresa tu número de orden arriba para ver los detalles de tu armado en vivo.
+                <Text style={{ color: '#5b6b62', fontSize: 12, textAlign: 'center', marginTop: 20 }}>
+                  Ingresa tu número de orden arriba para ver el estado de tu pedido en vivo.
                 </Text>
               )}
             </ScrollView>
@@ -2808,539 +3732,6 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Modal del Armador de PC Guiado Completo (10 Pasos) */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={mostrarArmador}
-        onRequestClose={() => { setMostrarArmador(false); }}
-      >
-        <View style={styles.modalDetalleCentrado}>
-          <View style={[styles.modalDetalleContenido, { maxHeight: '92%', maxWidth: 650 }]}>
-            
-            {/* Header del Armador */}
-            <View style={styles.modalDetalleHeader}>
-              <Text style={styles.modalDetalleCategoria}>
-                {armarPaso <= 10 ? `🛠️ Armador de PC - Paso ${armarPaso} de 10` : '📋 Resumen de la PC Armada'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setMostrarArmador(false)}
-                style={styles.botonModalCerrarIcono}
-              >
-                <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Stepper Flow Horizontal Expandido */}
-            {armarPaso <= 10 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12, backgroundColor: '#0a0e1a', padding: 8, borderRadius: 8 }}>
-                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, color: armarPaso === 1 ? '#38bdf8' : armarPaso > 1 ? '#10b981' : '#64748b', fontWeight: '900' }}>1. CPU</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 2 ? '#38bdf8' : armarPaso > 2 ? '#10b981' : '#64748b', fontWeight: '900' }}>2. Tarjeta Madre</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 3 ? '#38bdf8' : armarPaso > 3 ? '#10b981' : '#64748b', fontWeight: '900' }}>3. RAM</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 4 ? '#38bdf8' : armarPaso > 4 ? '#10b981' : '#64748b', fontWeight: '900' }}>4. GPU</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 5 ? '#38bdf8' : armarPaso > 5 ? '#10b981' : '#64748b', fontWeight: '900' }}>5. SSD/Disco</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 6 ? '#38bdf8' : armarPaso > 6 ? '#10b981' : '#64748b', fontWeight: '900' }}>6. Fuente PSU</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 7 ? '#38bdf8' : armarPaso > 7 ? '#10b981' : '#64748b', fontWeight: '900' }}>7. Case / Gabinete</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 8 ? '#38bdf8' : armarPaso > 8 ? '#10b981' : '#64748b', fontWeight: '900' }}>8. Coolers</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 9 ? '#38bdf8' : armarPaso > 9 ? '#10b981' : '#64748b', fontWeight: '900' }}>9. Fans (Opt)</Text>
-                  <Text style={{ fontSize: 11, color: '#475569' }}>➔</Text>
-                  <Text style={{ fontSize: 11, color: armarPaso === 10 ? '#38bdf8' : armarPaso > 10 ? '#10b981' : '#64748b', fontWeight: '900' }}>10. Periféricos (Opt)</Text>
-                </View>
-              </ScrollView>
-            )}
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              
-              {/* PASO 1: Selección de Procesador (CPU) */}
-              {armarPaso === 1 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>1. Selecciona tu Procesador (CPU)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('procesador') || p.categoria_nombre.toLowerCase().includes('cpu')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`cpu-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, cpuSeleccionado?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setCpuSeleccionado(p);
-                          setArmarPaso(2);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-                </View>
-              )}
-
-              {/* PASO 2: Selección de Tarjeta Madre */}
-              {armarPaso === 2 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>2. Selecciona tu Tarjeta Madre (Motherboard)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('madre') || p.categoria_nombre.toLowerCase().includes('motherboard') || p.categoria_nombre.toLowerCase().includes('placa')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`mb-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, motherboardSeleccionada?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setMotherboardSeleccionada(p);
-                          setArmarPaso(3);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-                  
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(1)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Procesador</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 3: Selección de Memoria RAM */}
-              {armarPaso === 3 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>3. Selecciona tu Memoria RAM</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && p.categoria_nombre.toLowerCase().includes('ram'))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`ram-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, ramSeleccionada?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setRamSeleccionada(p);
-                          setArmarPaso(4);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(2)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Tarjeta Madre</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 4: Selección de Tarjeta de Video (GPU) */}
-              {armarPaso === 4 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>4. Selecciona tu Tarjeta de Video (GPU)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('video') || p.categoria_nombre.toLowerCase().includes('gpu')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`gpu-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, gpuSeleccionada?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setGpuSeleccionada(p);
-                          setArmarPaso(5);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(3)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a RAM</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 5: Selección de Almacenamiento (SSD / NVMe) */}
-              {armarPaso === 5 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>5. Selecciona tu Almacenamiento (SSD / NVMe)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('almacenamiento') || p.categoria_nombre.toLowerCase().includes('ssd') || p.categoria_nombre.toLowerCase().includes('disco')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`ssd-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, almacenamientoSeleccionado?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setAlmacenamientoSeleccionado(p);
-                          setArmarPaso(6);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(4)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Tarjeta de Video</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 6: Selección de Fuente de Poder (PSU) */}
-              {armarPaso === 6 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>6. Selecciona tu Fuente de Poder (PSU)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('fuente') || p.categoria_nombre.toLowerCase().includes('poder') || p.categoria_nombre.toLowerCase().includes('psu')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`psu-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, fuenteSeleccionada?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setFuenteSeleccionada(p);
-                          setArmarPaso(7);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(5)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Almacenamiento</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 7: Selección de Gabinete / Case */}
-              {armarPaso === 7 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>7. Selecciona tu Gabinete / Case de PC</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('gabinete') || p.categoria_nombre.toLowerCase().includes('case') || p.categoria_nombre.toLowerCase().includes('chasis')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`case-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, caseSeleccionado?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setCaseSeleccionado(p);
-                          setArmarPaso(8);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(6)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Fuente de Poder</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 8: Selección de Enfriamiento / Cooler */}
-              {armarPaso === 8 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>8. Selecciona tu Sistema de Enfriamiento (Líquido o Aire)</Text>
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('enfriamiento') || p.categoria_nombre.toLowerCase().includes('cooler') || p.categoria_nombre.toLowerCase().includes('disipador')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`cooler-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, enfriamientoSeleccionado?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setEnfriamientoSeleccionado(p);
-                          setArmarPaso(9);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(7)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Gabinete / Case</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 9: Selección de Ventiladores / Fans (Opcional) */}
-              {armarPaso === 9 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>9. Selecciona Ventiladores Adicionales / Fans RGB (Opcional)</Text>
-                  
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#10b981', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 }}
-                    onPress={() => {
-                      setFansSeleccionados(null);
-                      setArmarPaso(10);
-                    }}
-                  >
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>⏭️ Omitir / Siguiente sin Fans Adicionales</Text>
-                  </TouchableOpacity>
-
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('ventilador') || p.categoria_nombre.toLowerCase().includes('fan')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`fan-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, fansSeleccionados?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setFansSeleccionados(p);
-                          setArmarPaso(10);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(8)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Enfriamiento</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 10: Selección de Periféricos & Monitor (Opcional) */}
-              {armarPaso === 10 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>10. Selecciona Periféricos o Monitor (Opcional)</Text>
-
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#10b981', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 }}
-                    onPress={() => {
-                      setPerifericoSeleccionado(null);
-                      setArmarPaso(11);
-                    }}
-                  >
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>⏭️ Omitir / Finalizar sin Periféricos Adicionales</Text>
-                  </TouchableOpacity>
-
-                  {productos
-                    .filter(p => p.categoria_nombre && (p.categoria_nombre.toLowerCase().includes('periférico') || p.categoria_nombre.toLowerCase().includes('periferico') || p.categoria_nombre.toLowerCase().includes('accesorios') || p.categoria_nombre.toLowerCase().includes('audífonos')))
-                    .map((p, idx) => (
-                      <TouchableOpacity
-                        key={`peri-${p.id}-${idx}`}
-                        style={[styles.tarjetaProductoReferencia, perifericoSeleccionado?.id === p.id && { borderColor: '#38bdf8', borderWidth: 2 }, { marginVertical: 6, paddingVertical: 12 }]}
-                        onPress={() => {
-                          setPerifericoSeleccionado(p);
-                          setArmarPaso(11);
-                        }}
-                      >
-                        <Text style={styles.nombreTexto}>{p.nombre}</Text>
-                        <Text style={styles.stockTexto}>Precio: ₡{Number(p.precio || 0).toFixed(2)} | Stock: {p.stock} uds</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 12 }]}
-                    onPress={() => setArmarPaso(9)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Ventiladores</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* PASO 11: Resumen General de la PC Armada y Añadir al Carrito */}
-              {armarPaso === 11 && (
-                <View>
-                  <Text style={[styles.seccionTitulo, { marginTop: 0, color: '#38bdf8' }]}>📋 Resumen de tu PC Armada Personalizada</Text>
-                  
-                  <View style={{ backgroundColor: '#0a0e1a', padding: 16, borderRadius: 12, borderWidth: 2, borderColor: '#38bdf8', gap: 10 }}>
-                    
-                    {cpuSeleccionado && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Procesador (CPU)</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{cpuSeleccionado.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(cpuSeleccionado.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {motherboardSeleccionada && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Tarjeta Madre (Motherboard)</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{motherboardSeleccionada.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(motherboardSeleccionada.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {ramSeleccionada && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Memoria RAM</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{ramSeleccionada.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(ramSeleccionada.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {gpuSeleccionada && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Tarjeta de Video (GPU)</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{gpuSeleccionada.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(gpuSeleccionada.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {almacenamientoSeleccionado && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Almacenamiento (SSD / NVMe)</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{almacenamientoSeleccionado.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(almacenamientoSeleccionado.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {fuenteSeleccionada && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Fuente de Poder (PSU)</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{fuenteSeleccionada.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(fuenteSeleccionada.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {caseSeleccionado && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Gabinete / Case</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{caseSeleccionado.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(caseSeleccionado.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {enfriamientoSeleccionado && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Sistema de Enfriamiento</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{enfriamientoSeleccionado.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(enfriamientoSeleccionado.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {fansSeleccionados && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Ventiladores / Fans RGB</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{fansSeleccionados.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(fansSeleccionados.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    {perifericoSeleccionado && (
-                      <View style={{ borderBottomWidth: 1, borderBottomColor: '#1f2937', paddingBottom: 6 }}>
-                        <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Periférico / Monitor</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{perifericoSeleccionado.nombre}</Text>
-                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡{Number(perifericoSeleccionado.precio || 0).toFixed(2)}</Text>
-                      </View>
-                    )}
-
-                    <View style={{ borderTopWidth: 1, borderTopColor: '#374151', paddingTop: 8 }}>
-                      <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800' }}>Servicio de Ensamble</Text>
-                      <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>Servicio de Armado y Optimización Profesional</Text>
-                      <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>₡15,000.00</Text>
-                    </View>
-
-                    {/* Desglose de Totales */}
-                    {(() => {
-                      const componentes = [
-                        cpuSeleccionado,
-                        motherboardSeleccionada,
-                        ramSeleccionada,
-                        gpuSeleccionada,
-                        almacenamientoSeleccionado,
-                        fuenteSeleccionada,
-                        caseSeleccionado,
-                        enfriamientoSeleccionado,
-                        fansSeleccionados,
-                        perifericoSeleccionado
-                      ].filter(Boolean);
-
-                      const subtotalPiesas = componentes.reduce((sum, c) => sum + Number(c.precio || 0), 0) + 15000;
-                      const ivaMonto = subtotalPiesas * 0.13;
-                      const totalConIva = subtotalPiesas * 1.13;
-
-                      return (
-                        <View style={{ borderTopWidth: 2, borderTopColor: '#38bdf8', paddingTop: 10, gap: 4 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ color: '#94a3b8', fontSize: 13 }}>Subtotal Neto:</Text>
-                            <Text style={{ color: '#e2e8f0', fontSize: 14, fontWeight: '800' }}>₡{subtotalPiesas.toFixed(2)}</Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ color: '#fbbf24', fontSize: 13, fontWeight: '800' }}>IVA Obligatorio (13%):</Text>
-                            <Text style={{ color: '#fbbf24', fontSize: 14, fontWeight: '800' }}>₡{ivaMonto.toFixed(2)}</Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#1f2937' }}>
-                            <Text style={{ color: '#38bdf8', fontSize: 16, fontWeight: '900' }}>Total (IVA Incluido):</Text>
-                            <Text style={{ color: '#10b981', fontSize: 20, fontWeight: '950' }}>₡{totalConIva.toFixed(2)}</Text>
-                          </View>
-                        </View>
-                      );
-                    })()}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#10b981', marginTop: 20, paddingVertical: 14 }]}
-                    onPress={() => {
-                      const componentesAElegir = [
-                        cpuSeleccionado,
-                        motherboardSeleccionada,
-                        ramSeleccionada,
-                        gpuSeleccionada,
-                        almacenamientoSeleccionado,
-                        fuenteSeleccionada,
-                        caseSeleccionado,
-                        enfriamientoSeleccionado,
-                        fansSeleccionados,
-                        perifericoSeleccionado
-                      ].filter(Boolean);
-
-                      setCarrito([
-                        ...carrito,
-                        ...componentesAElegir.map(c => ({ ...c, cantidad: 1 })),
-                        { id: 9999, nombre: 'Servicio de Ensamble de PC Profesional', precio: 15000, stock: 99, categoria_nombre: 'Servicios', cantidad: 1 }
-                      ]);
-                      setEsOrdenEnsambleActual(true);
-                      setMostrarArmador(false);
-                      Alert.alert(
-                        '¡PC Armada Añadida!',
-                        `Se han agregado tus ${componentesAElegir.length} componentes seleccionados más el Servicio de Ensamble (₡15,000) al carrito.`
-                      );
-                    }}
-                  >
-                    <Text style={[styles.botonAccionPrincipalTexto, { fontSize: 15, fontWeight: '900' }]}>🛒 AÑADIR CONFIGURACIÓN COMPLETA AL CARRITO</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.botonAccionPrincipal, { backgroundColor: '#374151', marginTop: 10 }]}
-                    onPress={() => setArmarPaso(10)}
-                  >
-                    <Text style={styles.botonAccionPrincipalTexto}>◀ Volver a Ajustar Piezas</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* Pantalla Independiente de Pago Tilopay (WebView Sandbox) */}
       <PantallaPagoTilopay
@@ -3351,6 +3742,188 @@ export default function App() {
         onError={manejarErrorTilopay}
       />
 
+      {/* Modal de Configuración de Google Authenticator (2FA) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modal2FAVisible}
+        onRequestClose={() => setModal2FAVisible(false)}
+      >
+        <View style={styles.modalDetalleCentrado}>
+          <View style={[styles.modalDetalleContenido, { maxWidth: 440, padding: 22 }]}>
+            <View style={styles.modalDetalleHeader}>
+              <Text style={[styles.seccionTituloInterno, { marginBottom: 0, fontSize: 16, textAlign: 'left' }]}>
+                🛡️ Google Authenticator (2FA)
+              </Text>
+              <TouchableOpacity onPress={() => setModal2FAVisible(false)} style={styles.botonModalCerrarIcono}>
+                <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10 }}>
+              {estado2FAUsuario ? (
+                <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                  <Text style={{ fontSize: 48, marginBottom: 10 }}>✅</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#16a34a', textAlign: 'center' }}>
+                    Tu cuenta tiene 2FA activado
+                  </Text>
+                  <Text style={{ color: '#475569', fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 20 }}>
+                    Google Authenticator está vinculado y protegiendo tus inicios de sesión y recuperaciones de cuenta.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.botonAccionPrincipal, { backgroundColor: '#ef4444', width: '100%' }]}
+                    onPress={() => {
+                      setClaveODesactivar2FA('');
+                      setModalDesactivar2FAVisible(true);
+                    }}
+                    disabled={cargando2FA}
+                  >
+                    <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff' }]}>
+                      {cargando2FA ? 'Procesando...' : 'Desactivar 2FA'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View>
+                  <Text style={{ color: '#334155', fontSize: 13, lineHeight: 18, marginBottom: 10 }}>
+                    1. Abre tu aplicación <Text style={{ fontWeight: '800' }}>Google Authenticator</Text> en tu teléfono.
+                  </Text>
+                  <Text style={{ color: '#334155', fontSize: 13, lineHeight: 18, marginBottom: 10 }}>
+                    2. Toca el botón <Text style={{ fontWeight: '800' }}>"+"</Text> y escanea este código QR:
+                  </Text>
+
+                  {datosConfiguracion2FA?.qrDataUrl ? (
+                    <View style={{ alignItems: 'center', marginVertical: 8, backgroundColor: '#ffffff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignSelf: 'center' }}>
+                      <Image
+                        source={{ uri: datosConfiguracion2FA.qrDataUrl }}
+                        style={{ width: 180, height: 180 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : (
+                    <ActivityIndicator size="large" color="#22a34a" style={{ marginVertical: 20 }} />
+                  )}
+
+                  <Text style={{ color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+                    O introduce esta clave manual si no puedes escanear:
+                  </Text>
+                  <View style={{ backgroundColor: '#f1f5f9', padding: 8, borderRadius: 8, marginVertical: 6, alignItems: 'center' }}>
+                    <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                      {datosConfiguracion2FA?.secret || 'Generando clave...'}
+                    </Text>
+                  </View>
+
+                  <Text style={{ color: '#334155', fontSize: 13, lineHeight: 18, marginTop: 12, marginBottom: 8 }}>
+                    3. Ingresa el código de 6 dígitos que muestra tu app para confirmar la vinculación:
+                  </Text>
+
+                  <TextInput
+                    style={[
+                      styles.formInput,
+                      {
+                        textAlign: 'center',
+                        fontSize: 22,
+                        fontWeight: '900',
+                        letterSpacing: 8,
+                        marginBottom: 14,
+                        color: '#0f172a',
+                      },
+                    ]}
+                    placeholder="000000"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={codigoActivacion2FA}
+                    onChangeText={(txt) => setCodigoActivacion2FA(txt.replace(/[^0-9]/g, '').slice(0, 6))}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.botonAccionPrincipal,
+                      codigoActivacion2FA.length !== 6 && { backgroundColor: '#94a3b8' },
+                    ]}
+                    onPress={confirmarActivar2FA}
+                    disabled={cargando2FA || codigoActivacion2FA.length !== 6}
+                  >
+                    <Text style={styles.botonAccionPrincipalTexto}>
+                      {cargando2FA ? 'Verificando...' : 'Confirmar y Activar 2FA'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ marginTop: 14, alignItems: 'center' }}
+                    onPress={() => abrirModal2FA(true)}
+                    disabled={cargando2FA}
+                  >
+                    <Text style={{ color: '#2563eb', fontSize: 12, fontWeight: '700' }}>
+                      🔄 ¿No funciona el código? Generar nuevo código QR
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para Desactivar 2FA ingresando Contraseña o Código */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalDesactivar2FAVisible}
+        onRequestClose={() => setModalDesactivar2FAVisible(false)}
+      >
+        <View style={styles.modalDetalleCentrado}>
+          <View style={[styles.modalDetalleContenido, { maxWidth: 400, padding: 22 }]}>
+            <View style={styles.modalDetalleHeader}>
+              <Text style={[styles.seccionTituloInterno, { marginBottom: 0, fontSize: 16, textAlign: 'left', color: '#be123c' }]}>
+                🔒 Desactivar 2FA
+              </Text>
+              <TouchableOpacity onPress={() => setModalDesactivar2FAVisible(false)} style={styles.botonModalCerrarIcono}>
+                <Text style={styles.botonModalCerrarIconoTexto}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: '#475569', fontSize: 13, lineHeight: 18, marginVertical: 12 }}>
+              Para confirmar que eres el dueño de la cuenta, ingresa tu <Text style={{ fontWeight: '700' }}>contraseña actual</Text> o el <Text style={{ fontWeight: '700' }}>código de 6 dígitos</Text> de Google Authenticator:
+            </Text>
+
+            <TextInput
+              style={styles.formInput}
+              placeholder="Contraseña o código de 6 dígitos"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry={claveODesactivar2FA.length !== 6}
+              value={claveODesactivar2FA}
+              onChangeText={setClaveODesactivar2FA}
+              autoFocus={true}
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.botonAccionPrincipal,
+                { backgroundColor: '#ef4444', marginTop: 4 },
+                !claveODesactivar2FA.trim() && { backgroundColor: '#94a3b8' },
+              ]}
+              onPress={() => desactivar2FA(claveODesactivar2FA)}
+              disabled={cargando2FA || !claveODesactivar2FA.trim()}
+            >
+              <Text style={[styles.botonAccionPrincipalTexto, { color: '#ffffff' }]}>
+                {cargando2FA ? 'Procesando...' : 'Confirmar y Desactivar 2FA'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ marginTop: 12, alignItems: 'center' }}
+              onPress={() => setModalDesactivar2FAVisible(false)}
+            >
+              <Text style={{ color: '#64748b', fontSize: 12, textDecorationLine: 'underline' }}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -3359,16 +3932,16 @@ export default function App() {
 const styles = StyleSheet.create({
   contenedorPrincipal: {
     flex: 1,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: '#111827',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#1f2937',
+    backgroundColor: '#6cc04a',
+    borderBottomWidth: 4,
+    borderBottomColor: '#f97316',
   },
   headerFilaSuperior: {
     flexDirection: 'row',
@@ -3376,27 +3949,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitulo: {
-    fontSize: 23,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#3b82f6',
+    color: '#ffffff',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     flex: 1,
     marginRight: 10,
   },
   botonAccesoHeader: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#f97316',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#3b82f6',
+    shadowColor: '#f97316',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 4,
   },
   botonAccesoHeaderText: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 12,
     letterSpacing: 0.5,
@@ -3413,23 +3986,23 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   botonCerrarSesionTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 12,
     letterSpacing: 0.5,
   },
   headerSubtitulo: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#f0fbe9',
     marginTop: 8,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   contenedorCategorias: {
-    backgroundColor: '#111827',
+    backgroundColor: '#ffffff',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#e1eed9',
   },
   scrollCategorias: {
     paddingHorizontal: 16,
@@ -3442,12 +4015,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   botonCategoriaActivo: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#60a5fa',
+    backgroundColor: '#f97316',
+    borderColor: '#fb923c',
   },
   botonCategoriaInactivo: {
-    backgroundColor: '#1f2937',
-    borderColor: '#374151',
+    backgroundColor: '#e1eed9',
+    borderColor: '#cfe3c6',
   },
   textoCategoria: {
     fontWeight: '800',
@@ -3455,16 +4028,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   textoCategoriaActivo: {
-    color: '#ffffff',
+    color: '#1c2b22',
   },
   textoCategoriaInactivo: {
-    color: '#9ca3af',
+    color: '#5b6b62',
   },
   contenedorFichas: {
     flexDirection: 'row',
-    backgroundColor: '#111827',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1.5,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#e1eed9',
   },
   fichaBoton: {
     flex: 1,
@@ -3473,28 +4046,28 @@ const styles = StyleSheet.create({
   },
   fichaBotonActiva: {
     borderBottomWidth: 3.5,
-    borderBottomColor: '#3b82f6',
+    borderBottomColor: '#f97316',
   },
   fichaBotonTexto: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#9ca3af',
+    color: '#5b6b62',
     letterSpacing: 0.5,
   },
   fichaBotonTextoActiva: {
-    color: '#3b82f6',
+    color: '#f97316',
   },
   cuerpoFormularios: {
     padding: 20,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
   },
   formularioTarjeta: {
-    backgroundColor: '#151f32',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1.5,
-    borderColor: '#243249',
+    borderColor: '#d6ebcc',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -3504,7 +4077,7 @@ const styles = StyleSheet.create({
   seccionTituloInterno: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#1c2b22',
     marginBottom: 20,
     textAlign: 'center',
     letterSpacing: 1,
@@ -3513,35 +4086,47 @@ const styles = StyleSheet.create({
   formEtiqueta: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#06b6d4',
+    color: '#6cc04a',
     marginBottom: 6,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   formInput: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: '#cfe3c6',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
     marginBottom: 20,
     fontSize: 15,
-    color: '#ffffff',
+    color: '#1c2b22',
+  },
+  dropdownSeleccionable: {
+    backgroundColor: '#eef7ea',
+    borderWidth: 1.5,
+    borderColor: '#6cc04a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   botonAccionPrincipal: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#f97316',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
-    shadowColor: '#3b82f6',
+    shadowColor: '#f97316',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 6,
   },
   botonAccionPrincipalTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 16,
     letterSpacing: 0.5,
@@ -3550,34 +4135,58 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
   },
   cargandoTexto: {
     marginTop: 14,
-    color: '#9ca3af',
+    color: '#5b6b62',
     fontSize: 15,
     fontWeight: '600',
   },
   listaProductos: {
     padding: 16,
     paddingBottom: 220,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
   },
   contenedorAdminPanel: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
+    width: '100%',
+    maxWidth: 1300,
+    alignSelf: 'center',
   },
   seccionTitulo: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#1c2b22',
     marginVertical: 16,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
+  tarjetaProductoGrid: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#d6ebcc',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    minWidth: 260,
+  },
+  imagenProductoGrid: {
+    width: '100%',
+    height: 190,
+    backgroundColor: '#ffffff',
+    resizeMode: 'cover',
+  },
   tarjetaProducto: {
-    backgroundColor: '#151f32',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
@@ -3585,7 +4194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1.5,
-    borderColor: '#243249',
+    borderColor: '#d6ebcc',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -3593,12 +4202,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   imagenProducto: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 84,
+    height: 84,
+    borderRadius: 14,
     marginRight: 14,
-    backgroundColor: '#0f172a',
-    resizeMode: 'contain',
+    backgroundColor: '#ffffff',
+    resizeMode: 'cover',
+    borderWidth: 1.5,
+    borderColor: '#cfe3c6',
+    overflow: 'hidden',
   },
   infoTarjeta: {
     flex: 1,
@@ -3607,7 +4219,7 @@ const styles = StyleSheet.create({
   categoriaTexto: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#06b6d4',
+    color: '#6cc04a',
     textTransform: 'uppercase',
     marginBottom: 4,
     letterSpacing: 1,
@@ -3615,12 +4227,12 @@ const styles = StyleSheet.create({
   nombreTexto: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#1c2b22',
     letterSpacing: 0.3,
   },
   descripcionTexto: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#5b6b62',
     marginTop: 4,
     lineHeight: 18,
   },
@@ -3632,7 +4244,7 @@ const styles = StyleSheet.create({
   precioTexto: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#10b981',
+    color: '#22a34a',
     marginRight: 14,
     letterSpacing: 0.5,
   },
@@ -3640,41 +4252,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: '#94a3b8',
+    color: '#5b6b62',
   },
   stockDisponible: {
-    color: '#34d399',
+    color: '#4ade80',
   },
   stockAgotado: {
     color: '#f87171',
   },
   botonAgregar: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#f97316',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#3b82f6',
+    shadowColor: '#f97316',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
   botonAgregarDeshabilitado: {
-    backgroundColor: '#374151',
+    backgroundColor: '#cfe3c6',
   },
   botonAgregarTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 13,
     letterSpacing: 0.5,
   },
   tarjetaOrden: {
-    backgroundColor: '#151f32',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderColor: '#243249',
+    borderColor: '#d6ebcc',
     shadowColor: '#000000',
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -3683,41 +4295,41 @@ const styles = StyleSheet.create({
   ordenIdTexto: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#1c2b22',
     letterSpacing: 0.5,
   },
   ordenDetalleTexto: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#5b6b62',
     marginTop: 4,
   },
   ordenTotalTexto: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#10b981',
+    color: '#22a34a',
     marginTop: 6,
     letterSpacing: 0.5,
   },
   tarjetaProductoReferencia: {
-    backgroundColor: '#151f32',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderLeftWidth: 5,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: '#f97316',
     borderWidth: 1,
-    borderColor: '#243249',
+    borderColor: '#d6ebcc',
   },
   carritoFlotante: {
     position: 'absolute',
     bottom: 24,
     left: 16,
     right: 16,
-    backgroundColor: '#111827',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1.5,
-    borderColor: '#1f2937',
+    borderColor: '#e1eed9',
     elevation: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
@@ -3733,20 +4345,20 @@ const styles = StyleSheet.create({
   carritoTotalItems: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#9ca3af',
+    color: '#5b6b62',
     letterSpacing: 0.5,
   },
   carritoMontoTotal: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#10b981',
+    color: '#22a34a',
     letterSpacing: 0.5,
   },
   miniCarritoLista: {
     maxHeight: 100,
     marginBottom: 14,
     borderTopWidth: 1.5,
-    borderTopColor: '#1f2937',
+    borderTopColor: '#e1eed9',
     paddingTop: 10,
   },
   miniCartItem: {
@@ -3757,7 +4369,7 @@ const styles = StyleSheet.create({
   },
   miniCartText: {
     fontSize: 13,
-    color: '#d1d5db',
+    color: '#3f4f46',
     flex: 1,
     fontWeight: '600',
   },
@@ -3774,7 +4386,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   botonRemoverMiniText: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '900',
     fontSize: 13,
   },
@@ -3790,14 +4402,14 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   botonProcesarTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
   },
   checkoutOverlay: {
     padding: 20,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
   },
   filaBotonesCheckout: {
     flexDirection: 'row',
@@ -3816,15 +4428,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   botonCancelarCheckout: {
-    backgroundColor: '#374151',
-    shadowColor: '#374151',
+    backgroundColor: '#cfe3c6',
+    shadowColor: '#cfe3c6',
   },
   botonConfirmarCheckout: {
-    backgroundColor: '#10b981',
-    shadowColor: '#10b981',
+    backgroundColor: '#22a34a',
+    shadowColor: '#22a34a',
   },
   botonCheckoutFormTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 15,
     letterSpacing: 0.5,
@@ -3832,9 +4444,9 @@ const styles = StyleSheet.create({
   contenedorFichasVendedor: {
     flexDirection: 'row',
     marginTop: 12,
-    backgroundColor: '#111827',
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#1f2937',
+    borderTopColor: '#e1eed9',
   },
   filaOrdenHeader: {
     flexDirection: 'row',
@@ -3853,7 +4465,7 @@ const styles = StyleSheet.create({
   },
   estadoCompletado: {
     backgroundColor: '#065f46',
-    color: '#34d399',
+    color: '#4ade80',
   },
   estadoCancelado: {
     backgroundColor: '#7f1d1d',
@@ -3861,14 +4473,14 @@ const styles = StyleSheet.create({
   },
   estadoPendiente: {
     backgroundColor: '#78350f',
-    color: '#fbbf24',
+    color: '#f97316',
   },
   filaAccionesOrden: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 12,
     borderTopWidth: 1.5,
-    borderTopColor: '#1f2937',
+    borderTopColor: '#e1eed9',
     paddingTop: 10,
   },
   botonAccionOrden: {
@@ -3882,15 +4494,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   botonAccionOrdenCompletar: {
-    backgroundColor: '#10b981',
-    shadowColor: '#10b981',
+    backgroundColor: '#22a34a',
+    shadowColor: '#22a34a',
   },
   botonAccionOrdenCancelar: {
     backgroundColor: '#ef4444',
     shadowColor: '#ef4444',
   },
   botonAccionOrdenTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '800',
     fontSize: 13,
     letterSpacing: 0.5,
@@ -3906,72 +4518,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   botonCategoriaOptionActivo: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#60a5fa',
+    backgroundColor: '#f97316',
+    borderColor: '#fb923c',
   },
   botonCategoriaOptionInactivo: {
-    backgroundColor: '#1e293b',
-    borderColor: '#334155',
+    backgroundColor: '#eef7ea',
+    borderColor: '#cfe3c6',
   },
   textoCategoriaOptionActivo: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '700',
     fontSize: 12,
   },
   textoCategoriaOptionInactivo: {
-    color: '#94a3b8',
+    color: '#5b6b62',
     fontWeight: '600',
     fontSize: 12,
   },
   botonCrearNuevaCategoriaToggle: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eef7ea',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#cfe3c6',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 20,
   },
   botonCrearNuevaCategoriaToggleTexto: {
-    color: '#3b82f6',
+    color: '#f97316',
     fontWeight: '700',
     fontSize: 13,
   },
   subFormularioTarjeta: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#eef7ea',
   },
   subFormEtiqueta: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#38bdf8',
+    color: '#6cc04a',
     marginBottom: 6,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   subFormInput: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eef7ea',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#cfe3c6',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 12,
     fontSize: 14,
-    color: '#ffffff',
+    color: '#1c2b22',
   },
   botonSubAccion: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#22a34a',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
   },
   botonSubAccionTexto: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontWeight: '700',
     fontSize: 13,
   },
@@ -3983,10 +4595,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalDetalleContenido: {
-    backgroundColor: '#111827',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#1f2937',
+    borderColor: '#e1eed9',
     padding: 20,
     width: '100%',
     maxHeight: '90%',
@@ -4005,7 +4617,7 @@ const styles = StyleSheet.create({
   modalDetalleCategoria: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#38bdf8',
+    color: '#6cc04a',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -4013,55 +4625,68 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eef7ea',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#cfe3c6',
   },
   botonModalCerrarIconoTexto: {
-    color: '#94a3b8',
+    color: '#5b6b62',
     fontSize: 14,
     fontWeight: 'bold',
   },
+  modalContenedorImagenFrame: {
+    width: '100%',
+    height: 250,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#cfe3c6',
+    overflow: 'hidden',
+    marginBottom: 18,
+  },
   modalDetalleImagen: {
     width: '100%',
-    height: 220,
-    borderRadius: 16,
-    backgroundColor: '#0a0e1a',
-    resizeMode: 'contain',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#1f2937',
+    height: '100%',
+    resizeMode: 'cover',
   },
   modalDetalleTitulo: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '950',
+    color: '#1c2b22',
     marginBottom: 16,
-    lineHeight: 28,
+    lineHeight: 30,
+    letterSpacing: 0.3,
+  },
+  modalContenedorDescripcion: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#eef7ea',
+    marginBottom: 18,
   },
   modalDetalleDescripcion: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#3f4f46',
     lineHeight: 22,
-    marginBottom: 20,
   },
   modalDetalleFilaInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#f3faef',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#e1eed9',
     marginBottom: 10,
   },
   modalDetallePrecio: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#10b981',
+    color: '#22a34a',
     marginTop: 4,
   },
 });

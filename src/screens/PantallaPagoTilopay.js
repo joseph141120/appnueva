@@ -218,9 +218,42 @@ export default function PantallaPagoTilopay({
         }
       }
 
+      // Ocultar banner de ambiente de pruebas / sandbox de Tilopay
+      function ocultarAvisoPruebas() {
+        try {
+          // A. Ocultar por selección de clases estándar de alertas y sandbox de Tilopay
+          var banners = Array.from(document.querySelectorAll('.alert, .alert-warning, .alert-info, .sandbox-banner, .test-banner, [class*="sandbox"], [class*="test-banner"], [class*="testMode"]'));
+          banners.forEach(function(b) {
+            b.style.setProperty('display', 'none', 'important');
+            b.style.setProperty('height', '0px', 'important');
+            b.style.setProperty('margin', '0px', 'important');
+            b.style.setProperty('padding', '0px', 'important');
+          });
+
+          // B. Ocultar por búsqueda en el texto del DOM
+          var todosLosElementos = Array.from(document.querySelectorAll('*'));
+          todosLosElementos.forEach(function(el) {
+            if (el.children.length === 0 && el.innerText) {
+              var txt = el.innerText.toLowerCase();
+              if (txt.includes('ambiente de prueba') || txt.includes('ambiente de pruebas') || txt.includes('modo de prueba') || txt.includes('modo prueba') || txt.includes('modo de test')) {
+                var contenedor = el.closest('.alert') || el.closest('.banner') || el.closest('div') || el;
+                if (contenedor) {
+                  contenedor.style.setProperty('display', 'none', 'important');
+                  contenedor.style.setProperty('height', '0px', 'important');
+                  contenedor.style.setProperty('margin', '0px', 'important');
+                  contenedor.style.setProperty('padding', '0px', 'important');
+                  contenedor.style.setProperty('visibility', 'hidden', 'important');
+                }
+              }
+            }
+          });
+        } catch(e) {}
+      }
+
       setInterval(function() {
         inyectarEnVerDetalleLimpio();
         ocultarFacturacionRepetida();
+        ocultarAvisoPruebas();
         monitorearErroresEnTextoGlobal();
       }, 350);
     })();
@@ -340,7 +373,7 @@ export default function PantallaPagoTilopay({
         {/* Indicador de Carga inicial */}
         {cargandoUrl && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#38bdf8" />
+            <ActivityIndicator size="large" color="#6cc04a" />
             <Text style={styles.textoCargando}>Cargando pasarela Tilopay...</Text>
           </View>
         )}
@@ -393,7 +426,7 @@ export default function PantallaPagoTilopay({
 const styles = StyleSheet.create({
   contenedor: {
     flex: 1,
-    backgroundColor: '#0f172a'
+    backgroundColor: '#ffffff'
   },
   header: {
     flexDirection: 'row',
@@ -401,9 +434,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eef7ea',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155'
+    borderBottomColor: '#cfe3c6'
   },
   botonCerrar: {
     paddingVertical: 6,
@@ -422,19 +455,19 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   tituloHeader: {
-    color: '#38bdf8',
+    color: '#6cc04a',
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5
   },
   badgeSandbox: {
-    backgroundColor: '#0284c7',
+    backgroundColor: '#f97316',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6
   },
   textoBadge: {
-    color: '#ffffff',
+    color: '#1c2b22',
     fontSize: 10,
     fontWeight: '900'
   },
@@ -444,12 +477,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     padding: 30,
     alignItems: 'center'
   },
   textoCargando: {
-    color: '#94a3b8',
+    color: '#5b6b62',
     marginTop: 12,
     fontSize: 14,
     fontWeight: '600'
