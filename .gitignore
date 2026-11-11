@@ -34,6 +34,7 @@ yarn-error.*
 .env
 .env*.local
 *firebase-service-account*.json
+google-services.json
 
 # typescript
 *.tsbuildinfo
