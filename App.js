@@ -1737,8 +1737,23 @@ export default function App() {
       transparent={true}
       onRequestClose={() => setMostrarModalPoliticas(false)}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 650, maxHeight: '90%', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+        <View style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 16,
+          width: '100%',
+          maxWidth: 650,
+          height: '85%',
+          maxHeight: '90%',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 10
+        }}>
           
           {/* Encabezado del Modal con Logo */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1.5, borderBottomColor: '#e2e8f0', paddingBottom: 12 }}>
@@ -1759,7 +1774,7 @@ export default function App() {
           </View>
 
           {/* Selector de Pestañas: Políticas vs Condiciones */}
-          <View style={{ flexDirection: 'row', marginTop: 14, marginBottom: 12, backgroundColor: '#f1f5f9', borderRadius: 10, padding: 3 }}>
+          <View style={{ flexDirection: 'row', marginTop: 14, marginBottom: 8, backgroundColor: '#f1f5f9', borderRadius: 10, padding: 3 }}>
             <TouchableOpacity
               style={{
                 flex: 1,
@@ -1790,8 +1805,17 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
+          <Text style={{ fontSize: 11, color: '#64748b', textAlign: 'center', marginBottom: 6 }}>
+            Desliza hacia abajo para consultar el contenido completo ⬇️
+          </Text>
+
           {/* Contenido con Scroll */}
-          <ScrollView style={{ flex: 1, marginVertical: 4 }} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ScrollView
+            style={{ flex: 1, minHeight: 280, marginVertical: 4 }}
+            contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+          >
             {tabPoliticas === 'seguridad' ? (
               <View>
                 <View style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 }}>
