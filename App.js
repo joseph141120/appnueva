@@ -1729,6 +1729,251 @@ export default function App() {
     );
   };
 
+  // Modal interactivo de Políticas de Seguridad y Términos y Condiciones
+  const renderModalPoliticas = () => (
+    <Modal
+      visible={mostrarModalPoliticas}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setMostrarModalPoliticas(false)}
+    >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 650, maxHeight: '90%', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}>
+          
+          {/* Encabezado del Modal con Logo */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1.5, borderBottomColor: '#e2e8f0', paddingBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <Image source={require('./assets/logo.png')} style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#ffffff' }} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: '#1c2b22' }}>
+                  JLK SOLUTIONS SECURITY, C.A.
+                </Text>
+                <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '800' }}>
+                  Normativa, Políticas y Condiciones Oficiales
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setMostrarModalPoliticas(false)} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#dc2626' }}>Cerrar ✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Selector de Pestañas: Políticas vs Condiciones */}
+          <View style={{ flexDirection: 'row', marginTop: 14, marginBottom: 12, backgroundColor: '#f1f5f9', borderRadius: 10, padding: 3 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                alignItems: 'center',
+                borderRadius: 8,
+                backgroundColor: tabPoliticas === 'seguridad' ? '#16a34a' : 'transparent',
+              }}
+              onPress={() => setTabPoliticas('seguridad')}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: tabPoliticas === 'seguridad' ? '#ffffff' : '#475569' }}>
+                🛡️ Políticas de Seguridad
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                alignItems: 'center',
+                borderRadius: 8,
+                backgroundColor: tabPoliticas === 'condiciones' ? '#16a34a' : 'transparent',
+              }}
+              onPress={() => setTabPoliticas('condiciones')}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: tabPoliticas === 'condiciones' ? '#ffffff' : '#475569' }}>
+                📜 Términos y Condiciones
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Contenido con Scroll */}
+          <ScrollView style={{ flex: 1, marginVertical: 4 }} contentContainerStyle={{ paddingBottom: 20 }}>
+            {tabPoliticas === 'seguridad' ? (
+              <View>
+                <View style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                  <Text style={{ color: '#065f46', fontWeight: '800', fontSize: 13 }}>
+                    🛡️ Marco de Ciberseguridad y Mitigación OWASP
+                  </Text>
+                  <Text style={{ color: '#047857', fontSize: 12, marginTop: 4, lineHeight: 18 }}>
+                    La plataforma aplica estándares estrictos de seguridad en desarrollo de software, criptografía en reposo y tránsito, y protección contra intrusiones.
+                  </Text>
+                </View>
+
+                {/* 1. Contraseñas */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    1. 🔐 Política de Contraseñas Fuertes
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Longitud mínima obligatoria de 8 caracteres.
+                    {'\n'}• Debe contener al menos una letra mayúscula (A-Z).
+                    {'\n'}• Debe contener al menos una letra minúscula (a-z).
+                    {'\n'}• Debe contener al menos un dígito numérico (0-9).
+                    {'\n'}• Debe contener al menos un carácter especial (!@#$%^&*...).
+                    {'\n'}• Verificación estricta en tiempo real en frontend y backend.
+                  </Text>
+                </View>
+
+                {/* 2. Rate Limiting */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    2. ⏱️ Bloqueo Progresivo contra Fuerza Bruta (Estilo iPhone)
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Se permiten un máximo de 5 intentos fallidos consecutivos de autenticación.
+                    {'\n'}• Al 5to intento erróneo, la cuenta entra en bloqueo temporal progresivo (1 min, 5 min, 10 min, 15 min).
+                    {'\n'}• Respuestas de tiempo constante contra ataques de temporización (Timing Attacks).
+                  </Text>
+                </View>
+
+                {/* 3. 2FA */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    3. 📱 Doble Factor de Autenticación (2FA TOTP)
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Integración nativa con Google Authenticator mediante algoritmo RFC 6238.
+                    {'\n'}• Generación de secretos criptográficos seguros y códigos QR escaneables.
+                    {'\n'}• Códigos de un solo uso de 6 dígitos con ventana de caducidad estricta (30 segundos).
+                  </Text>
+                </View>
+
+                {/* 4. Cifrado */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    4. 🔒 Criptografía en Reposo y Tokens de Sesión
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Las contraseñas se almacenan mediante hash irreversible Bcrypt (cost factor 10).
+                    {'\n'}• Las respuestas a preguntas de seguridad se normalizan y cifran con Bcrypt (cost factor 12).
+                    {'\n'}• Tokens de sesión Bearer criptográficos de 256 bits generados con CSPRNG (Crypto seguro).
+                  </Text>
+                </View>
+
+                {/* 5. OWASP y Privacidad */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    5. 👁️ Protección de Privacidad y Mitigación OWASP
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Se prohíbe exponer correos electrónicos en notificaciones push y alertas públicas; el sistema identifica a los colaboradores por su Nombre Completo y Rol (mitigando OWASP A01 y A02).
+                    {'\n'}• Los datos de costos y márgenes de ganancia se filtran en el backend para clientes y vistas públicas.
+                    {'\n'}• Cabeceras de seguridad HTTP activas: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection.
+                  </Text>
+                </View>
+
+                {/* 6. Conexión HTTPS */}
+                <View style={{ marginBottom: 6, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    6. ☁️ Seguridad en Tránsito y Nube
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Todo el tráfico móvil y web viaja obligatoriamente sobre HTTPS con certificados TLS 1.3 en Railway.
+                    {'\n'}• Base de datos MySQL aislada en red privada interna sin puertos públicos abiertos.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View>
+                <View style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                  <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 13 }}>
+                    📜 Términos y Condiciones Comerciales y de Servicio
+                  </Text>
+                  <Text style={{ color: '#1d4ed8', fontSize: 12, marginTop: 4, lineHeight: 18 }}>
+                    Condiciones aplicables a la venta, instalación, despacho y soporte de equipos de seguridad electrónica y automatización.
+                  </Text>
+                </View>
+
+                {/* 1. Modalidades de Venta */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    1. 🛒 Modalidades de Venta y Facturación
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Las compras realizadas en el sistema se registran de contado o mostrador.
+                    {'\n'}• Toda venta genera un comprobante digital oficial en PDF con desglose del 13% de IVA y número de orden único para rastreo del cliente.
+                  </Text>
+                </View>
+
+                {/* 2. Garantía */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    2. 🛡️ Garantía Oficial de Equipos (12 Meses)
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Cámaras de seguridad (HD, IP, PTZ y Solares), grabadores DVR/NVR, energizadores de cerco eléctrico y motores de portón cuentan con 12 meses de garantía contra defectos de fábrica.
+                    {'\n'}• Las baterías de respaldo y fuentes conmutadas cuentan con 6 meses de garantía.
+                  </Text>
+                </View>
+
+                {/* 3. Exclusiones de Garantía */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    3. ⚠️ Exclusiones de la Garantía
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Daños causados por descargas atmosféricas (rayos) en cercos o cámaras sin varilla de puesta a tierra reglamentaria.
+                    {'\n'}• Sobretensiones de la red eléctrica pública sin supresores de picos.
+                    {'\n'}• Manipulación, apertura de sellos o modificaciones técnicas por personal no certificado.
+                  </Text>
+                </View>
+
+                {/* 4. Protección de Datos */}
+                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    4. 📋 Protección de Datos y Confidencialidad
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • En cumplimiento de la Ley de Protección de la Persona frente al Tratamiento de sus Datos Personales, la información de clientes (nombre, teléfono, correo y cédula) se utiliza únicamente para facturación y garantías.
+                    {'\n'}• JLK Solutions Security no vende ni comparte bases de datos con terceros.
+                  </Text>
+                </View>
+
+                {/* 5. Uso Responsable de Cuentas */}
+                <View style={{ marginBottom: 6, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
+                    5. 👤 Responsabilidad de Credenciales
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
+                    • Cada usuario administrativo o vendedor es responsable exclusivo de la custodia de sus contraseñas y del dispositivo móvil vinculado a su 2FA.
+                    {'\n'}• Se recomienda actualizar la contraseña periódicamente desde el módulo de configuración.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Botón de Cierre Claro y Visible */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#16a34a',
+              paddingVertical: 14,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 10,
+              shadowColor: '#16a34a',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 4,
+            }}
+            onPress={() => setMostrarModalPoliticas(false)}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16, letterSpacing: 0.5 }}>
+              ✓ Entendido y Aceptar
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      </View>
+    </Modal>
+  );
+
   // Vista de Autenticación Integrada (Solo Login del Personal)
   if (sesion === 'auth') {
     return (
@@ -1881,6 +2126,9 @@ export default function App() {
             </View>
           )}
         </ScrollView>
+
+        {/* Modal oficial de Políticas de Seguridad y Términos y Condiciones */}
+        {renderModalPoliticas()}
       </SafeAreaView>
     );
   }
@@ -2397,236 +2645,6 @@ export default function App() {
     </ScrollView>
   );
 
-  // Modal interactivo de Políticas de Seguridad y Términos y Condiciones
-  const renderModalPoliticas = () => (
-    <Modal
-      visible={mostrarModalPoliticas}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setMostrarModalPoliticas(false)}
-    >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 650, maxHeight: '90%', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}>
-          
-          {/* Encabezado del Modal con Logo */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1.5, borderBottomColor: '#e2e8f0', paddingBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-              <Image source={require('./assets/logo.png')} style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#ffffff' }} resizeMode="contain" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: '#1c2b22' }}>
-                  JLK SOLUTIONS SECURITY, C.A.
-                </Text>
-                <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '800' }}>
-                  Normativa, Políticas y Condiciones Oficiales
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => setMostrarModalPoliticas(false)} style={{ padding: 6, borderRadius: 8, backgroundColor: '#f1f5f9' }}>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#64748b' }}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Selector de Pestañas: Políticas vs Condiciones */}
-          <View style={{ flexDirection: 'row', marginTop: 14, marginBottom: 12, backgroundColor: '#f1f5f9', borderRadius: 10, padding: 3 }}>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                paddingVertical: 10,
-                alignItems: 'center',
-                borderRadius: 8,
-                backgroundColor: tabPoliticas === 'seguridad' ? '#16a34a' : 'transparent',
-              }}
-              onPress={() => setTabPoliticas('seguridad')}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: tabPoliticas === 'seguridad' ? '#ffffff' : '#475569' }}>
-                🛡️ Políticas de Seguridad
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                paddingVertical: 10,
-                alignItems: 'center',
-                borderRadius: 8,
-                backgroundColor: tabPoliticas === 'condiciones' ? '#16a34a' : 'transparent',
-              }}
-              onPress={() => setTabPoliticas('condiciones')}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: tabPoliticas === 'condiciones' ? '#ffffff' : '#475569' }}>
-                📜 Términos y Condiciones
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Contenido con Scroll */}
-          <ScrollView style={{ flex: 1, marginVertical: 4 }} contentContainerStyle={{ paddingBottom: 20 }}>
-            {tabPoliticas === 'seguridad' ? (
-              <View>
-                <View style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-                  <Text style={{ color: '#065f46', fontWeight: '800', fontSize: 13 }}>
-                    🛡️ Marco de Ciberseguridad y Mitigación OWASP
-                  </Text>
-                  <Text style={{ color: '#047857', fontSize: 12, marginTop: 4, lineHeight: 18 }}>
-                    La plataforma aplica estándares estrictos de seguridad en desarrollo de software, criptografía en reposo y tránsito, y protección contra intrusiones.
-                  </Text>
-                </View>
-
-                {/* 1. Contraseñas */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    1. 🔐 Política de Contraseñas Fuertes
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Longitud mínima obligatoria de 8 caracteres.
-                    {'\n'}• Debe contener al menos una letra mayúscula (A-Z).
-                    {'\n'}• Debe contener al menos una letra minúscula (a-z).
-                    {'\n'}• Debe contener al menos un dígito numérico (0-9).
-                    {'\n'}• Debe contener al menos un carácter especial (!@#$%^&*...).
-                    {'\n'}• Verificación estricta en tiempo real en frontend y backend.
-                  </Text>
-                </View>
-
-                {/* 2. Rate Limiting */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    2. ⏱️ Bloqueo Progresivo contra Fuerza Bruta (Estilo iPhone)
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Se permiten un máximo de 5 intentos fallidos consecutivos de autenticación.
-                    {'\n'}• Al 5to intento erróneo, la cuenta entra en bloqueo temporal progresivo (1 min, 5 min, 10 min, 15 min).
-                    {'\n'}• Respuestas de tiempo constante contra ataques de temporización (Timing Attacks).
-                  </Text>
-                </View>
-
-                {/* 3. 2FA */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    3. 📱 Doble Factor de Autenticación (2FA TOTP)
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Integración nativa con Google Authenticator mediante algoritmo RFC 6238.
-                    {'\n'}• Generación de secretos criptográficos seguros y códigos QR escaneables.
-                    {'\n'}• Códigos de un solo uso de 6 dígitos con ventana de caducidad estricta (30 segundos).
-                  </Text>
-                </View>
-
-                {/* 4. Cifrado */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    4. 🔒 Criptografía en Reposo y Tokens de Sesión
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Las contraseñas se almacenan mediante hash irreversible Bcrypt (cost factor 10).
-                    {'\n'}• Las respuestas a preguntas de seguridad se normalizan y cifran con Bcrypt (cost factor 12).
-                    {'\n'}• Tokens de sesión Bearer criptográficos de 256 bits generados con CSPRNG (Crypto seguro).
-                  </Text>
-                </View>
-
-                {/* 5. OWASP y Privacidad */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    5. 👁️ Protección de Privacidad y Mitigación OWASP
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Se prohíbe exponer correos electrónicos en notificaciones push y alertas públicas; el sistema identifica a los colaboradores por su Nombre Completo y Rol (mitigando OWASP A01 y A02).
-                    {'\n'}• Los datos de costos y márgenes de ganancia se filtran en el backend para clientes y vistas públicas.
-                    {'\n'}• Cabeceras de seguridad HTTP activas: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection.
-                  </Text>
-                </View>
-
-                {/* 6. Conexión HTTPS */}
-                <View style={{ marginBottom: 6, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    6. ☁️ Seguridad en Tránsito y Nube
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Todo el tráfico móvil y web viaja obligatoriamente sobre HTTPS con certificados TLS 1.3 en Railway.
-                    {'\n'}• Base de datos MySQL aislada en red privada interna sin puertos públicos abiertos.
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View>
-                <View style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-                  <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 13 }}>
-                    📜 Términos y Condiciones Comerciales y de Servicio
-                  </Text>
-                  <Text style={{ color: '#1d4ed8', fontSize: 12, marginTop: 4, lineHeight: 18 }}>
-                    Condiciones aplicables a la venta, instalación, despacho y soporte de equipos de seguridad electrónica y automatización.
-                  </Text>
-                </View>
-
-                {/* 1. Modalidades de Venta */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    1. 🛒 Modalidades de Venta y Facturación
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Las compras realizadas en el sistema se registran de contado o mostrador.
-                    {'\n'}• Toda venta genera un comprobante digital oficial en PDF con desglose del 13% de IVA y número de orden único para rastreo del cliente.
-                  </Text>
-                </View>
-
-                {/* 2. Garantía */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    2. 🛡️ Garantía Oficial de Equipos (12 Meses)
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Cámaras de seguridad (HD, IP, PTZ y Solares), grabadores DVR/NVR, energizadores de cerco eléctrico y motores de portón cuentan con 12 meses de garantía contra defectos de fábrica.
-                    {'\n'}• Las baterías de respaldo y fuentes conmutadas cuentan con 6 meses de garantía.
-                  </Text>
-                </View>
-
-                {/* 3. Exclusiones de Garantía */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    3. ⚠️ Exclusiones de la Garantía
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Daños causados por descargas atmosféricas (rayos) en cercos o cámaras sin varilla de puesta a tierra reglamentaria.
-                    {'\n'}• Sobretensiones de la red eléctrica pública sin supresores de picos.
-                    {'\n'}• Manipulación, apertura de sellos o modificaciones técnicas por personal no certificado.
-                  </Text>
-                </View>
-
-                {/* 4. Protección de Datos */}
-                <View style={{ marginBottom: 14, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    4. 📋 Protección de Datos y Confidencialidad
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • En cumplimiento de la Ley de Protección de la Persona frente al Tratamiento de sus Datos Personales, la información de clientes (nombre, teléfono, correo y cédula) se utiliza únicamente para facturación y garantías.
-                    {'\n'}• JLK Solutions Security no vende ni comparte bases de datos con terceros.
-                  </Text>
-                </View>
-
-                {/* 5. Uso Responsable de Cuentas */}
-                <View style={{ marginBottom: 6, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1e293b' }}>
-                    5. 👤 Responsabilidad de Credenciales
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 18 }}>
-                    • Cada usuario administrativo o vendedor es responsable exclusivo de la custodia de sus contraseñas y del dispositivo móvil vinculado a su 2FA.
-                    {'\n'}• Se recomienda actualizar la contraseña periódicamente desde el módulo de configuración.
-                  </Text>
-                </View>
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Botón de Cierre */}
-          <TouchableOpacity
-            style={[styles.botonAccionPrincipal, { backgroundColor: '#1e293b', marginTop: 8 }]}
-            onPress={() => setMostrarModalPoliticas(false)}
-          >
-            <Text style={styles.botonAccionPrincipalTexto}>Entendido y Aceptar</Text>
-          </TouchableOpacity>
-
-        </View>
-      </View>
-    </Modal>
-  );
 
   return (
     <SafeAreaView style={styles.contenedorPrincipal}>
@@ -2687,12 +2705,6 @@ export default function App() {
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <TouchableOpacity
-                style={[styles.botonAccesoHeader, { backgroundColor: '#f0fdf4', paddingHorizontal: 10, borderWidth: 1, borderColor: '#bbf7d0' }]}
-                onPress={() => setMostrarModalPoliticas(true)}
-              >
-                <Text style={[styles.botonAccesoHeaderText, { color: '#15803d' }]}>🛡️ Políticas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.botonAccesoHeader, { backgroundColor: '#ffffff', paddingHorizontal: 12 }]}
                 onPress={() => setMostrarRastreador(true)}
               >
@@ -2704,9 +2716,19 @@ export default function App() {
             </View>
           )}
         </View>
-        <Text style={styles.headerSubtitulo}>
-          {sesion ? `Rol: ${sesion.toUpperCase()}` : 'Modo: Invitado (Consulta de Catálogo)'}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, flexWrap: 'wrap', gap: 6 }}>
+          <Text style={[styles.headerSubtitulo, { marginTop: 0 }]}>
+            {sesion ? `Rol: ${sesion.toUpperCase()}` : 'Modo: Invitado (Consulta de Catálogo)'}
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.35)' }}
+            onPress={() => setMostrarModalPoliticas(true)}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>
+              🛡️ Políticas y Condiciones
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {sesion === 'vendedor' && (
           <View style={styles.contenedorFichasVendedor}>
