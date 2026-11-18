@@ -202,6 +202,9 @@ export default function App() {
   const [mostrarModalPoliticas, setMostrarModalPoliticas] = useState(false);
   const [tabPoliticas, setTabPoliticas] = useState('seguridad'); // 'seguridad' | 'condiciones'
 
+  // Estado para aceptación obligatoria de términos y políticas en compras
+  const [aceptaTerminosYPoliticas, setAceptaTerminosYPoliticas] = useState(false);
+
   // Módulo de Carrito y Formulario de Facturación del Cliente
   const [mostrarCarritoModal, setMostrarCarritoModal] = useState(false);
   const [mostrarFormularioFacturacion, setMostrarFormularioFacturacion] = useState(false);
@@ -1417,6 +1420,7 @@ export default function App() {
     setCarrito([]);
     setMostrarCarritoModal(false);
     setMostrarFormularioFacturacion(false);
+    setAceptaTerminosYPoliticas(false);
     setCheckoutNombre('');
     setCheckoutEmail('');
     setCheckoutCedula('');
@@ -1431,6 +1435,14 @@ export default function App() {
 
   // Envía los datos del cliente invitado y luego procesa su orden
   const procesarCheckoutCliente = async () => {
+    if (!aceptaTerminosYPoliticas) {
+      Alert.alert(
+        'Términos y Políticas Requeridos',
+        'Debes marcar la casilla: "He leído los términos y políticas y estoy de acuerdo" para poder efectuar la compra.'
+      );
+      return;
+    }
+
     if (!checkoutNombre || !checkoutEmail || !checkoutCedula || !checkoutTelefono) {
       Alert.alert('Datos Requeridos', 'Por favor rellene Nombre, Correo, Cédula y Teléfono para procesar la orden.');
       return;
@@ -1454,6 +1466,14 @@ export default function App() {
 
   // Inicia el proceso de pago seguro en la pasarela Tilopay (Modo Sandbox via WebView)
   const procesarPagoTilopay = () => {
+    if (!aceptaTerminosYPoliticas) {
+      Alert.alert(
+        'Términos y Políticas Requeridos',
+        'Debes marcar la casilla: "He leído los términos y políticas y estoy de acuerdo" para poder procesar el pago.'
+      );
+      return;
+    }
+
     if (!checkoutNombre || !checkoutEmail || !checkoutCedula || !checkoutTelefono) {
       Alert.alert('Datos Requeridos', 'Por favor rellene Nombre, Correo, Cédula y Teléfono antes de procesar el pago.');
       return;
@@ -1591,6 +1611,11 @@ export default function App() {
         const catS = categoriaSeleccionada.toLowerCase().trim();
         return catP === catS || catP.includes(catS) || catS.includes(catP);
       });
+
+  // Muestra solo 5 productos en la pestaña principal ('Todas') y el listado de la categoría seleccionada
+  const productosParaMostrar = (categoriaSeleccionada === 'Todas' || !categoriaSeleccionada)
+    ? productosFiltrados.slice(0, 5)
+    : productosFiltrados;
 
   // Filtra el inventario en la sección de reabastecimiento
   const productosFiltradosReabastecer = productos.filter(p => {
@@ -1996,6 +2021,59 @@ export default function App() {
         </View>
       </View>
     </Modal>
+  );
+
+  // Componente interactivo de Aceptación de Términos y Políticas para compras
+  const renderCheckboxTerminos = () => (
+    <TouchableOpacity
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: aceptaTerminosYPoliticas ? '#f0fdf4' : '#fffbeb',
+        borderWidth: 1.5,
+        borderColor: aceptaTerminosYPoliticas ? '#86efac' : '#fde68a',
+        borderRadius: 12,
+        padding: 14,
+        marginVertical: 12,
+      }}
+      onPress={() => setAceptaTerminosYPoliticas(!aceptaTerminosYPoliticas)}
+      activeOpacity={0.8}
+    >
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 6,
+          borderWidth: 2,
+          borderColor: aceptaTerminosYPoliticas ? '#16a34a' : '#d97706',
+          backgroundColor: aceptaTerminosYPoliticas ? '#16a34a' : '#ffffff',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        {aceptaTerminosYPoliticas && (
+          <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15, lineHeight: 18 }}>✓</Text>
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13, color: '#1e293b', lineHeight: 18, fontWeight: '700' }}>
+          He leído los{' '}
+          <Text
+            style={{ color: '#16a34a', fontWeight: '900', textDecorationLine: 'underline' }}
+            onPress={() => setMostrarModalPoliticas(true)}
+          >
+            términos y políticas de seguridad
+          </Text>
+          {' '}y estoy de acuerdo.
+        </Text>
+        {!aceptaTerminosYPoliticas && (
+          <Text style={{ fontSize: 11, color: '#b45309', fontWeight: '700', marginTop: 2 }}>
+            ⚠️ Marca esta casilla para habilitar la compra
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 
   // Vista de Autenticación Integrada (Solo Login del Personal)
@@ -2841,6 +2919,9 @@ export default function App() {
             </View>
           </View>
 
+          {/* Casilla obligatoria de Términos y Políticas */}
+          {renderCheckboxTerminos()}
+
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[styles.botonCheckoutForm, styles.botonCancelarCheckout, { flex: 1, paddingVertical: 14 }]}
@@ -2850,8 +2931,15 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { flex: 1, paddingVertical: 14, backgroundColor: '#f97316' }]}
+              style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { flex: 1, paddingVertical: 14, backgroundColor: aceptaTerminosYPoliticas ? '#f97316' : '#cbd5e1' }]}
               onPress={() => {
+                if (!aceptaTerminosYPoliticas) {
+                  Alert.alert(
+                    'Términos y Políticas Requeridos',
+                    'Debes marcar la casilla: "He leído los términos y políticas y estoy de acuerdo" antes de procesar la compra.'
+                  );
+                  return;
+                }
                 if (sesion === 'vendedor') {
                   ejecutarVentaApi('vendedor@hardwarestore.com');
                 } else {
@@ -2925,13 +3013,16 @@ export default function App() {
               keyboardType="phone-pad"
             />
 
+            {/* Casilla obligatoria de Términos y Políticas */}
+            {renderCheckboxTerminos()}
+
             <Text style={[styles.formEtiqueta, { fontSize: 14, fontWeight: '900', color: '#f97316', marginTop: 10, marginBottom: 8, textAlign: 'center' }]}>
               MÉTODO DE PAGO
             </Text>
 
             {/* Botón Principal: Pagar con Tilopay Sandbox */}
             <TouchableOpacity
-              style={[styles.botonCheckoutForm, { backgroundColor: '#f97316', paddingVertical: 16, marginHorizontal: 0, marginBottom: 12, borderWidth: 1.5, borderColor: '#6cc04a' }]}
+              style={[styles.botonCheckoutForm, { backgroundColor: aceptaTerminosYPoliticas ? '#f97316' : '#cbd5e1', opacity: aceptaTerminosYPoliticas ? 1 : 0.6, paddingVertical: 16, marginHorizontal: 0, marginBottom: 12, borderWidth: 1.5, borderColor: aceptaTerminosYPoliticas ? '#6cc04a' : '#94a3b8' }]}
               onPress={procesarPagoTilopay}
             >
               <Text style={[styles.botonCheckoutFormTexto, { fontSize: 16, fontWeight: '900', color: '#1c2b22' }]}>
@@ -2948,7 +3039,7 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 12, backgroundColor: '#22a34a' }]}
+                style={[styles.botonCheckoutForm, styles.botonConfirmarCheckout, { paddingVertical: 12, backgroundColor: aceptaTerminosYPoliticas ? '#22a34a' : '#cbd5e1', opacity: aceptaTerminosYPoliticas ? 1 : 0.6 }]}
                 onPress={procesarCheckoutCliente}
               >
                 <Text style={[styles.botonCheckoutFormTexto, { fontSize: 14, fontWeight: '800' }]}>📝 Pago en Efectivo</Text>
@@ -3699,13 +3790,53 @@ export default function App() {
           ) : (
             <FlatList
               key={`catalog-grid-${numColumns}`}
-              data={productosFiltrados}
+              data={productosParaMostrar}
               renderItem={renderProducto}
               keyExtractor={item => item.id.toString()}
               numColumns={numColumns}
               contentContainerStyle={[styles.listaProductos, { maxWidth: 1300, width: '100%', alignSelf: 'center', paddingHorizontal: 16 }]}
               columnWrapperStyle={numColumns > 1 ? { justifyContent: 'flex-start', gap: 14 } : undefined}
               showsVerticalScrollIndicator={false}
+              ListFooterComponent={
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 24, marginBottom: 50, paddingHorizontal: 16 }}>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#f0fdf4',
+                      borderWidth: 1.5,
+                      borderColor: '#86efac',
+                      paddingVertical: 14,
+                      paddingHorizontal: 18,
+                      borderRadius: 14,
+                      maxWidth: 520,
+                      width: '100%',
+                      shadowColor: '#16a34a',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.12,
+                      shadowRadius: 5,
+                      elevation: 3,
+                    }}
+                    onPress={() => setMostrarModalPoliticas(true)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                      <Text style={{ fontSize: 26 }}>🛡️</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#166534', fontWeight: '900', fontSize: 15 }}>
+                          Políticas de Seguridad y Términos
+                        </Text>
+                        <Text style={{ color: '#15803d', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                          Normativa oficial, garantías de 12 meses y ciberseguridad
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ backgroundColor: '#16a34a', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}>
+                      <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>Consultar →</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              }
             />
           )
         )
