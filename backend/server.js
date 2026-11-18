@@ -597,6 +597,73 @@ registerRoutes('/preguntas-seguridad', 'get', (req, res) => {
   res.json({ success: true, preguntas: seguridad.PREGUNTAS_SEGURIDAD });
 });
 
+// Endpoint GET /politicas-y-condiciones: Políticas de Seguridad y Términos y Condiciones oficiales (Público)
+registerRoutes('/politicas-y-condiciones', 'get', (req, res) => {
+  res.json({
+    success: true,
+    empresa: {
+      nombre: 'JLK Solutions Security, C.A.',
+      slogan: 'Calidad y Excelencia en Seguridad',
+      version: '1.0.0',
+      vigencia: '2026 - 2027'
+    },
+    politicas_seguridad: [
+      {
+        titulo: 'Política de Contraseñas Fuertes',
+        descripcion: 'Toda credencial de acceso debe contar con mínimo 8 caracteres, incluyendo al menos una mayúscula, una minúscula, un número y un carácter especial.',
+        estatus: 'Obligatoria y validada en tiempo real'
+      },
+      {
+        titulo: 'Protección contra Ataques de Fuerza Bruta (Rate Limiting)',
+        descripcion: 'Tras 5 intentos fallidos consecutivos de inicio de sesión, la cuenta se bloquea progresivamente (1, 5, 10 y 15 minutos) mitigando accesos automatizados no autorizados.',
+        estatus: 'Activa con desbloqueo temporal automático'
+      },
+      {
+        titulo: 'Autenticación de Dos Factores (2FA)',
+        descripcion: 'Soporte e integración de Doble Factor mediante algoritmo TOTP (RFC 6238) compatible con Google Authenticator y códigos de un solo uso.',
+        estatus: 'Disponible para Administradores y Vendedores'
+      },
+      {
+        titulo: 'Cifrado de Credenciales y Respuestas',
+        descripcion: 'Almacenamiento de contraseñas mediante hash irreversible Bcrypt (cost factor 10) y respuestas de seguridad con Bcrypt (cost factor 12).',
+        estatus: 'Cifrado en reposo activo'
+      },
+      {
+        titulo: 'Protección de Privacidad y Mitigación OWASP',
+        descripcion: 'Los correos electrónicos personales y de empleados no se divulgan en notificaciones push ni alertas del sistema para prevenir ataques de ingeniería social e Information Disclosure.',
+        estatus: 'OWASP Top 10 A01 y A02 mitigados'
+      },
+      {
+        titulo: 'Cifrado en Tránsito (HTTPS / TLS)',
+        descripcion: 'Toda comunicación entre la app móvil y el backend en la nube viaja cifrada bajo protocolo seguro HTTPS con certificados TLS en Railway.',
+        estatus: 'Conexión segura verificada'
+      }
+    ],
+    terminos_condiciones: [
+      {
+        titulo: 'Condiciones de Venta y Facturación',
+        descripcion: 'Toda orden generada en el sistema bajo modalidad de Mostrador o Contado emite un comprobante digital con código de rastreo único y desglose de IVA.'
+      },
+      {
+        titulo: 'Garantía de Equipos de Seguridad Electrónica',
+        descripcion: 'Los equipos comercializados (cámaras de seguridad, DVRs, NVRs, energizadores de cerco y motores de portón) cuentan con 12 meses de garantía de fábrica contra defectos de manufactura.'
+      },
+      {
+        titulo: 'Exclusiones de Garantía',
+        descripcion: 'La garantía no cubre daños provocados por sobretensiones eléctricas, descargas atmosféricas (rayos sin polo a tierra reglamentario), o manipulación por personal no certificado.'
+      },
+      {
+        titulo: 'Tratamiento y Protección de Datos Personales',
+        descripcion: 'Los datos de contacto y facturación recopilados son estrictamente confidenciales y utilizados únicamente para despacho, soporte técnico y garantías.'
+      },
+      {
+        titulo: 'Responsabilidad y Custodia de Credenciales',
+        descripcion: 'El personal autorizado es el único responsable de la custodia de sus contraseñas y dispositivos vinculados a Google Authenticator.'
+      }
+    ]
+  });
+});
+
 // ===== Módulo de Configuración de Cuenta de Usuario =====
 
 // Consultar perfil del usuario autenticado (nombre, correo, rol, estado de 2FA)
